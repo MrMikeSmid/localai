@@ -1,9 +1,0 @@
-/wp-content/database/
-/wp-content/uploads/
-/wp-content/upgrade/
-/wp-content/cache/
-/wp-content/languages/
-/wp-config.local.php
-*.sqlite
-*.sqlite-shm
-*.sqlite-wal

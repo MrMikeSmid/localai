@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Midterm Dashboard 2026</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#14181f;--mut:#5b6572;--line:#e2e6ec;--d:#2563eb;--r:#dc2626}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--card:#171b22;--ink:#e8ecf2;--mut:#9aa5b4;--line:#262c36;--d:#60a5fa;--r:#f87171}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline}
+h1{font-size:22px;margin:0}h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:28px 0 10px}
+.sub,.note{color:var(--mut);font-size:13px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#16a34a;margin-right:6px}.dot.bad{background:#dc2626}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card h3{margin:0 0 10px;font-size:15px}
+.big{display:flex;justify-content:space-between;font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+.big span:first-child{color:var(--d)}.big span:last-child{color:var(--r)}
+.lab{display:flex;justify-content:space-between;font-size:12px;color:var(--mut)}
+.bar{display:flex;height:10px;border-radius:5px;overflow:hidden;margin:6px 0;background:var(--line)}
+.bar i{display:block;height:100%}.bar .d{background:var(--d)}.bar .r{background:var(--r)}
+.rows .row{padding:8px 0;border-top:1px solid var(--line)}.rows .row:first-child{border-top:0}
+.row b{font-weight:600}.err{color:var(--r)}
+</style>
+</head>
+<body>
+<main>
+<header><h1>Midterm Dashboard 2026</h1><div class="sub"><span class="dot" id="dot"></span><span id="status">Loading…</span></div></header>
+<p class="note">Live figures are <b>prediction-market odds</b> (Polymarket, no API key), refreshed every 30 seconds — probabilities, not official vote counts. Check AP or your state's election office for certified results.</p>
+<h2>Control of Congress</h2><div class="grid" id="control"></div>
+<h2>Balance of power</h2><div class="grid" id="bop"></div>
+<h2>Key Senate races</h2><div class="grid" id="races"></div>
+</main>
+<script>
+const API="https://gamma-api.polymarket.com/events?slug=";
+const RACES=[["texas-senate-election-winner","Texas"],["michigan-senate-election-winner","Michigan"],["maine-senate-election-winner","Maine"],["ohio-senate-election-winner","Ohio"],["alaska-senate-election-winner","Alaska"]];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const yes=m=>{try{return +JSON.parse(m.outcomePrices)[0]}catch(e){return null}};
+const pct=p=>p==null?"–":(p*100).toFixed(p<.1?1:0)+"%";
+async function ev(slug){const r=await fetch(API+slug);if(!r.ok)throw new Error(slug+" HTTP "+r.status);const j=await r.json();if(!j[0])throw new Error(slug+" not found");return j[0]}
+function duel(title,d,r,dl="Democrats",rl="Republicans"){
+ const t=(d||0)+(r||0)||1,dw=(d||0)/t*100;
+ return `<div class="card"><h3>${esc(title)}</h3><div class="big"><span>${pct(d)}</span><span>${pct(r)}</span></div>
+ <div class="bar"><i class="d" style="width:${dw}%"></i><i class="r" style="width:${100-dw}%"></i></div>
+ <div class="lab"><span>${esc(dl)}</span><span>${esc(rl)}</span></div></div>`}
+function party(e,word){let d=null,r=null;for(const m of e.markets){const q=m.question||"";if(q.includes("Democrat"))d=yes(m);else if(q.includes("Republican"))r=yes(m)}return[d,r]}
+async function refresh(){
+ try{
+  const [house,senate,bop,...races]=await Promise.all([ev("which-party-will-win-the-house-in-2026"),ev("which-party-will-win-the-senate-in-2026"),ev("balance-of-power-2026-midterms"),...RACES.map(r=>ev(r[0]))]);
+  const [hd,hr]=party(house),[sd,sr]=party(senate);
+  $("control").innerHTML=duel("House (435 seats)",hd,hr)+duel("Senate (35 seats up)",sd,sr);
+  $("bop").innerHTML='<div class="card rows" style="grid-column:1/-1">'+bop.markets.filter(m=>yes(m)!=null).map(m=>`<div class="row"><div class="lab"><b style="color:var(--ink)">${esc(m.groupItemTitle)}</b><span>${pct(yes(m))}</span></div><div class="bar"><i class="d" style="width:${yes(m)*100}%"></i></div></div>`).join("")+"</div>";
+  $("races").innerHTML=races.map((e,i)=>{const ms=e.markets.filter(m=>yes(m)!=null&&yes(m)>=.01).sort((a,b)=>yes(b)-yes(a));
+   return `<div class="card rows"><h3>${RACES[i][1]}</h3>`+ms.map(m=>`<div class="row"><div class="lab"><b style="color:var(--ink)">${esc(m.groupItemTitle||m.question)}</b><span>${pct(yes(m))}</span></div><div class="bar"><i class="${/\(R\)|Sullivan|Collins/.test(m.groupItemTitle||"")&&!/Peltola/.test(m.groupItemTitle)?"r":"d"}" style="width:${yes(m)*100}%"></i></div></div>`).join("")+"</div>"}).join("");
+  $("dot").className="dot";$("status").textContent="Live · updated "+new Date().toLocaleTimeString();
+ }catch(e){$("dot").className="dot bad";$("status").innerHTML='<span class="err">Feed unavailable ('+esc(e.message)+') — retrying</span>'}
+}
+refresh();setInterval(refresh,30000);
+</script>
+</body>
+</html>

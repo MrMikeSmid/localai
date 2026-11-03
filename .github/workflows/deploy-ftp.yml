@@ -41,14 +41,9 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          if [[ ! -f index.php && ! -f public/index.php ]]; then
+          if [[ ! -f index.html && ! -f index.php && ! -f public/index.php ]]; then
             printf 'Geen applicatiebestanden gevonden; FTP-deploy overgeslagen.\n'
             exit 0
-          fi
-
-          if [[ ! -f wp-content/db.php || ! -f wp-content/plugins/sqlite-database-integration/load.php ]]; then
-            printf 'Fout: de WordPress SQLite-integratie ontbreekt.\n' >&2
-            exit 1
           fi
 
           required_variables=(
