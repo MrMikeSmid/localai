@@ -24,10 +24,22 @@ h1{font-size:22px;margin:0}h2{font-size:13px;text-transform:uppercase;letter-spa
 .maj{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);left:50%}
 .waffle{display:grid;gap:3px;margin:12px 0 4px}
 .waffle b{aspect-ratio:1;border-radius:2px;background:var(--line)}.waffle .d{background:var(--d)}.waffle .r{background:var(--r)}
-.feed .item{padding:10px 0;border-top:1px solid var(--line)}.feed .item:first-child{border-top:0}
 .feed a{color:var(--ink);text-decoration:none}.feed a:hover{text-decoration:underline}
 .meta{font-size:12px;color:var(--mut);margin-top:2px}.src{font-weight:600}
 .err{color:var(--r)}
+.feed{padding:4px 14px}
+.feed .item{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.feed .item:first-child{border-top:0}
+.av{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff;background:#64748b}
+.body{min-width:0;flex:1}
+.top{display:flex;gap:6px;align-items:baseline;font-size:13px}.top b{font-weight:700}.top span{color:var(--mut)}
+.txt{margin:3px 0 0;font-size:14px;line-height:1.45;white-space:pre-line;overflow-wrap:anywhere}
+.txt.clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.more{background:none;border:0;padding:4px 0 0;color:var(--d);font:inherit;font-size:13px;cursor:pointer}
+.head{font-size:15px;font-weight:600;line-height:1.35;color:var(--ink)}
+.chip{display:inline-block;font-size:11px;font-weight:700;color:#fff;padding:1px 7px;border-radius:10px}
+.xcard{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.btn{background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px}
 </style>
 </head><body>
 <main>
@@ -40,8 +52,8 @@ h1{font-size:22px;margin:0}h2{font-size:13px;text-transform:uppercase;letter-spa
 <h2>Kans op meerderheid</h2>
 <div class="grid" id="control"></div>
 
-<h2>Laatste 5 posts op X — @realDonaldTrump</h2>
-<div class="card" id="x"><a class="twitter-timeline" data-tweet-limit="5" data-chrome="noheader nofooter" href="https://twitter.com/realDonaldTrump">Posts van @realDonaldTrump</a></div>
+<h2>Posts op X — @realDonaldTrump</h2>
+<div class="card xcard"><div><b>X-posts kunnen hier niet live getoond worden</b><div class="meta">X geeft zonder betaalde API-sleutel geen posts vrij aan een website; de ingesloten widget wordt geblokkeerd.</div></div><a class="btn" href="https://x.com/realDonaldTrump" target="_blank" rel="noopener">Open op X</a></div>
 
 <h2>Laatste Truth Social-posts — Donald Trump · <a href="https://truthsocial.com/@realDonaldTrump" target="_blank" rel="noopener" style="color:inherit">bekijk op Truth Social</a></h2>
 <div class="card feed" id="truth">Laden…</div>
@@ -49,7 +61,6 @@ h1{font-size:22px;margin:0}h2{font-size:13px;text-transform:uppercase;letter-spa
 <h2>Laatste nieuws — Amerikaanse zenders</h2>
 <div class="card feed" id="news">Laden…</div>
 </main>
-<script async src="https://platform.twitter.com/widgets.js"></script>
 <script>
 const API="https://gamma-api.polymarket.com/events?slug=";
 const R2J="https://api.rss2json.com/v1/api.json?rss_url=";
@@ -91,17 +102,22 @@ const parseDate=s=>{const d=new Date(/[zZ+]|GMT/.test(s)?s:String(s).replace(" "
 const ago=t=>{if(!t)return"";const m=Math.round((Date.now()-t)/60000);return m<1?"zojuist":m<60?m+" min geleden":m<1440?Math.round(m/60)+" uur geleden":Math.round(m/1440)+" dagen geleden"};
 async function feed(url){const r=await fetch(R2J+encodeURIComponent(url));if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();if(j.status!=="ok")throw new Error(j.message||"feed-fout");return j.items||[]}
 const strip=h=>{const d=document.createElement("div");d.innerHTML=h||"";return d.textContent.trim()};
+const tidy=t=>t.replace(/(TRUMP)(\S+\.\w+\/)/g,"$1\n$2").replace(/\s*[–—]\s+(?=[A-Z])/g,"\n• ").replace(/^•\s*/,"").replace(/(GET OUT AND VOTE FOR:)\s*/,"$1\n").trim();
+function toggle(btn){const t=btn.previousElementSibling;const c=t.classList.toggle("clamp");btn.textContent=c?"Meer":"Minder"}
+window.toggle=toggle;
 async function refreshTruth(){
  try{const items=(await feed("https://www.trumpstruth.org/feed")).slice(0,5);
-  $("truth").innerHTML=items.map(i=>`<div class="item"><a href="${esc(safe(i.link))}" target="_blank" rel="noopener">${esc(strip(i.title||i.description).slice(0,400))}</a><div class="meta">${esc(ago(parseDate(i.pubDate)))}</div></div>`).join("")||"Geen posts gevonden.";
+  $("truth").innerHTML=items.map(i=>{const t=tidy(strip(i.title||i.description)),long=t.length>220||t.split("\n").length>4;
+   return `<div class="item"><div class="av" style="background:#c0392b">DT</div><div class="body"><div class="top"><b>Donald J. Trump</b><span>Truth Social · ${esc(ago(parseDate(i.pubDate)))}</span></div><div class="txt${long?" clamp":""}">${esc(t)}</div>${long?'<button class="more" onclick="toggle(this)">Meer</button>':""}<div class="meta"><a href="${esc(safe(i.link))}" target="_blank" rel="noopener" style="color:inherit">Origineel bekijken ↗</a></div></div></div>`}).join("")||"Geen posts gevonden.";
  }catch(e){$("truth").innerHTML='<span class="err">Truth Social niet beschikbaar ('+esc(e.message)+')</span>'}
 }
 const SOURCES=[["NBC News","https://feeds.nbcnews.com/nbcnews/public/politics"],["CBS News","https://www.cbsnews.com/latest/rss/politics"],["Fox News","https://moxie.foxnews.com/google-publisher/politics.xml"],["ABC News","https://feeds.abcnews.com/abcnews/politicsheadlines"],["CNN","http://rss.cnn.com/rss/cnn_allpolitics.rss"]];
+const COL={"NBC News":"#6d28d9","CBS News":"#0369a1","Fox News":"#b91c1c","ABC News":"#1d4ed8","CNN":"#be123c"};
 async function refreshNews(){
  const res=await Promise.allSettled(SOURCES.map(async([n,u])=>(await feed(u)).slice(0,6).map(i=>({n,t:strip(i.title),l:i.link,ts:parseDate(i.pubDate)}))));
  const all=res.flatMap(r=>r.status==="fulfilled"?r.value:[]).sort((a,b)=>b.ts-a.ts).slice(0,12);
  const bad=res.filter(r=>r.status==="rejected").length;
- $("news").innerHTML=(all.map(i=>`<div class="item"><a href="${esc(safe(i.l))}" target="_blank" rel="noopener">${esc(i.t)}</a><div class="meta"><span class="src">${esc(i.n)}</span> · ${esc(ago(i.ts))}</div></div>`).join("")||'<span class="err">Nieuws niet beschikbaar</span>')+(bad&&all.length?`<div class="meta">${bad} van ${SOURCES.length} bronnen niet bereikbaar.</div>`:"");
+ $("news").innerHTML=(all.map(i=>`<div class="item"><div class="av" style="background:${COL[i.n]||"#64748b"}">${esc(i.n.slice(0,3).toUpperCase())}</div><div class="body"><div class="top"><b>${esc(i.n)}</b><span>${esc(ago(i.ts))}</span></div><a class="head" href="${esc(safe(i.l))}" target="_blank" rel="noopener">${esc(i.t)}</a></div></div>`).join("")||'<span class="err">Nieuws niet beschikbaar</span>')+(bad&&all.length?`<div class="meta">${bad} van ${SOURCES.length} bronnen niet bereikbaar.</div>`:"");
 }
 async function tick(){
  try{await refreshSeats();$("dot").className="dot";$("status").textContent="Live · bijgewerkt "+new Date().toLocaleTimeString("nl-NL")}
