@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lokale AI</title>
+<style>
+:root{
+  --bg:#FAF9F5;--side:#F0EEE6;--ink:#141413;--ink2:#3D3929;--mut:#73726C;--line:rgba(31,30,29,.14);
+  --card:#FFFFFF;--acc:#C6613F;--acc-h:#AE5334;--acc-t:#fff;--user:#F0EEE6;--code:#F0EEE6;--hover:rgba(31,30,29,.06);
+  --err:#B42318;--errbg:#FEF3F2;--ok:#2E8B57;--shadow:0 4px 24px rgba(0,0,0,.06),0 0 0 .5px rgba(31,30,29,.15);
+  --serif:ui-serif,"Iowan Old Style","Palatino Linotype",Georgia,"Times New Roman",serif;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+:root[data-theme=dark]{
+  --bg:#262624;--side:#1F1E1D;--ink:#F5F4EE;--ink2:#C2C0B6;--mut:#9C9A92;--line:rgba(255,255,255,.12);
+  --card:#30302E;--acc:#D97757;--acc-h:#E58A6C;--acc-t:#1a1918;--user:#141413;--code:#1F1E1D;--hover:rgba(255,255,255,.07);
+  --err:#FDA29B;--errbg:#3a1f1d;--shadow:0 4px 24px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.14);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ibtn{width:34px;height:34px;border-radius:8px;display:inline-grid;place-items:center;color:var(--mut)}
+.ibtn:hover{background:var(--hover);color:var(--ink)}
+.app{display:flex;height:100dvh;overflow:hidden}
+
+/* sidebar */
+.side{width:280px;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;flex:none;transition:transform .2s}
+.brand{display:flex;align-items:center;gap:8px;padding:16px 16px 8px;font:500 20px var(--serif)}
+.brand .spark{color:var(--acc);width:22px;height:22px}
+.newbtn{margin:8px 12px;padding:9px 12px;border-radius:10px;display:flex;align-items:center;gap:8px;font-weight:500;color:var(--acc)}
+.newbtn:hover{background:var(--hover)}
+.list{flex:1;overflow:auto;padding:4px 8px}
+.list h4{margin:12px 8px 4px;font:500 12px var(--sans);color:var(--mut)}
+.item{display:flex;align-items:center;gap:4px;padding:7px 8px 7px 10px;border-radius:8px;cursor:pointer;color:var(--ink2)}
+.item:hover,.item.on{background:var(--hover);color:var(--ink)}
+.item.on{background:rgba(31,30,29,.09)}
+:root[data-theme=dark] .item.on{background:rgba(255,255,255,.1)}
+.item .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .acts{display:none;gap:2px}.item:hover .acts{display:flex}
+.item .acts button{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--mut)}
+.item .acts button:hover{background:var(--hover);color:var(--ink)}
+.item .acts svg{width:15px;height:15px}
+.empty-s{color:var(--mut);padding:8px 10px;font-size:13px}
+.sidefoot{padding:10px 12px;border-top:1px solid var(--line);display:flex;gap:4px;align-items:center}
+.sidefoot .st{flex:1;min-width:0;font-size:12px;color:var(--mut);display:flex;align-items:center;gap:6px}
+.sidefoot .st span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}.dot.ok{background:var(--ok)}.dot.bad{background:#d92d20}
+
+/* main */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+.top{display:flex;align-items:center;gap:6px;padding:10px 14px;min-height:56px}
+.top .title{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top .menu{display:none}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);font-size:13px;color:var(--ink2);max-width:260px}
+.chip:hover{background:var(--hover)}
+.chip span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scroll{flex:1;overflow:auto;scroll-behavior:auto}
+.thread{max-width:768px;margin:0 auto;padding:12px 20px 40px;min-height:100%}
+.hello{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:55vh;gap:6px}
+.hello .spark{width:40px;height:40px;color:var(--acc);margin-bottom:8px}
+.hello h1{font:400 34px/1.2 var(--serif);margin:0;color:var(--ink2)}
+.hello p{color:var(--mut);margin:4px 0 18px}
+.sugg{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.sugg button{padding:8px 14px;border:1px solid var(--line);border-radius:999px;color:var(--ink2);font-size:14px}
+.sugg button:hover{background:var(--hover)}
+
+.msg{margin:18px 0;position:relative}
+.msg.user{display:flex;flex-direction:column;align-items:flex-end}
+.msg.user .bubble{background:var(--user);border-radius:16px;padding:10px 16px;max-width:85%;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg .acts{display:flex;gap:2px;margin-top:4px;opacity:0;transition:opacity .15s}
+.msg:hover .acts,.msg:last-child .acts,.msg.ai .acts.keep{opacity:1}
+.acts .ibtn{width:30px;height:30px}.acts .ibtn svg{width:16px;height:16px}
+.msg.ai{display:flex;gap:12px}
+.msg.ai>.spark{color:var(--acc);width:20px;height:20px;margin-top:5px}
+.msg.ai .col{flex:1;min-width:0}
+.msg.ai .body{font:17px/1.65 var(--serif);overflow-wrap:anywhere}
+.stats{font-size:12px;color:var(--mut);margin:2px 8px 0 6px;align-self:center}
+.foot{display:flex;align-items:center;flex-wrap:wrap}
+.editbox{width:100%;background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:10px}
+.editbox textarea{width:100%;min-height:90px;border:0;outline:0;resize:vertical;background:none;color:inherit;font:inherit}
+.editbox .row{display:flex;gap:8px;justify-content:flex-end}
+.btn{padding:7px 14px;border-radius:8px;border:1px solid var(--line);font-size:14px}
+.btn:hover{background:var(--hover)}
+.btn.pri{background:var(--acc);color:var(--acc-t);border-color:transparent}.btn.pri:hover{background:var(--acc-h)}
+.btn.danger{color:var(--err)}
+
+/* markdown */
+.body>*:first-child{margin-top:0}.body>*:last-child{margin-bottom:0}
+.body p{margin:0 0 .9em}
+.body h1,.body h2,.body h3,.body h4{font-family:var(--serif);font-weight:600;line-height:1.3;margin:1.3em 0 .5em}
+.body h1{font-size:1.5em}.body h2{font-size:1.28em}.body h3{font-size:1.12em}.body h4,.body h5,.body h6{font-size:1em}
+.body ul,.body ol{margin:0 0 .9em;padding-left:1.5em}.body li{margin:.2em 0}.body li>ul,.body li>ol{margin:.2em 0}
+.body a{color:var(--acc);text-decoration:underline;text-underline-offset:2px}
+.body blockquote{margin:0 0 .9em;padding:.1em 0 .1em 1em;border-left:3px solid var(--line);color:var(--ink2)}
+.body hr{border:0;border-top:1px solid var(--line);margin:1.4em 0}
+.body code{font:.86em var(--mono);background:var(--code);padding:.15em .38em;border-radius:5px}
+.code{margin:0 0 1em;background:var(--code);border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.code .ch{display:flex;justify-content:space-between;align-items:center;padding:5px 8px 5px 14px;font:12px var(--sans);color:var(--mut);border-bottom:1px solid var(--line)}
+.code .ch button{display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px}.code .ch button:hover{background:var(--hover);color:var(--ink)}
+.code .ch svg{width:14px;height:14px}
+.code pre{margin:0;padding:12px 14px;overflow:auto}
+.code pre code{background:none;padding:0;font-size:13.5px;line-height:1.55;white-space:pre}
+.tw{overflow:auto;margin:0 0 1em}
+.body table{border-collapse:collapse;font:15px var(--sans)}
+.body th,.body td{border:1px solid var(--line);padding:6px 12px}.body th{background:var(--code);text-align:left}
+.think{margin:0 0 .9em;font:14px/1.55 var(--sans);color:var(--mut)}
+.think summary{cursor:pointer;user-select:none;padding:2px 0}
+.think div{white-space:pre-wrap;border-left:2px solid var(--line);padding:4px 0 4px 12px;margin:6px 0 0}
+.dots{display:inline-flex;gap:5px;padding:8px 0}.dots i{width:7px;height:7px;border-radius:50%;background:var(--acc);animation:b 1.2s infinite ease-in-out}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes b{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+.error{margin-top:8px;padding:10px 14px;border-radius:10px;background:var(--errbg);color:var(--err);font:14px/1.5 var(--sans);white-space:pre-wrap}
+.note{margin-top:8px;font:13px var(--sans);color:var(--mut)}
+
+/* composer */
+.comp{padding:0 16px 14px}
+.box{max-width:768px;margin:0 auto;background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:12px 12px 10px 16px;display:flex;flex-direction:column;gap:6px}
+.box:focus-within{box-shadow:0 4px 24px rgba(0,0,0,.08),0 0 0 1.5px color-mix(in srgb,var(--acc) 55%,transparent)}
+.box textarea{border:0;outline:0;resize:none;background:none;color:inherit;font:16px/1.5 var(--sans);max-height:220px;min-height:28px;padding:2px 0}
+.box .row{display:flex;align-items:center;gap:8px}
+.box .row .sp{flex:1}
+.box .mdl{font-size:12.5px;color:var(--mut);padding:4px 8px;border-radius:8px;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.box .mdl:hover{background:var(--hover);color:var(--ink)}
+.send{width:34px;height:34px;border-radius:9px;background:var(--acc);color:var(--acc-t);display:grid;place-items:center}
+.send:hover{background:var(--acc-h)}.send:disabled{opacity:.35;cursor:default}
+.send svg{stroke-width:2.2}.send .sq{fill:currentColor;stroke:none;width:14px;height:14px}
+.disc{text-align:center;font-size:12px;color:var(--mut);margin-top:8px}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--bg);border-left:1px solid var(--line);z-index:30;transform:translateX(100%);transition:transform .22s;display:flex;flex-direction:column;box-shadow:-8px 0 32px rgba(0,0,0,.12)}
+.drawer.on{transform:none}
+.dh{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 14px 20px;border-bottom:1px solid var(--line)}
+.dh h2{margin:0;font:500 20px var(--serif)}
+.db{flex:1;overflow:auto;padding:6px 20px 28px}
+.db h3{font:600 12px var(--sans);text-transform:uppercase;letter-spacing:.07em;color:var(--mut);margin:24px 0 10px}
+.fld{margin:0 0 14px}
+.fld label{display:block;font-weight:500;font-size:14px;margin-bottom:4px}
+.fld .h{font-size:12.5px;color:var(--mut);margin-top:4px;line-height:1.4}
+.fld input[type=text],.fld input[type=password],.fld input[type=number],.fld textarea,.fld select{width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:inherit;font:14px var(--sans);outline:0}
+.fld input:focus,.fld textarea:focus,.fld select:focus{border-color:var(--acc)}
+.fld textarea{min-height:90px;resize:vertical}
+.fld textarea.code-t{font:13px/1.45 var(--mono);min-height:80px}
+.fld .bad{border-color:#d92d20!important}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.chk{display:flex;gap:10px;align-items:flex-start;margin:0 0 12px;cursor:pointer}
+.chk input{margin-top:3px;accent-color:var(--acc);width:16px;height:16px}
+.chk b{font-weight:500;display:block;font-size:14px}.chk small{color:var(--mut);font-size:12.5px;display:block;line-height:1.4}
+.rowb{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.cstat{font-size:13px;color:var(--mut)}.cstat.ok{color:var(--ok)}.cstat.bad{color:var(--err)}
+.mods{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.mods button{padding:4px 10px;border-radius:999px;border:1px solid var(--line);font-size:12.5px;color:var(--ink2)}
+.mods button:hover,.mods button.on{background:var(--acc);color:var(--acc-t);border-color:transparent}
+.range{display:flex;gap:10px;align-items:center}.range input[type=range]{flex:1;accent-color:var(--acc)}.range input[type=number]{width:84px!important}
+
+@media(max-width:820px){
+  .side{position:fixed;inset:0 auto 0 0;z-index:25;transform:translateX(-100%);width:min(300px,86vw)}
+  .side.on{transform:none}
+  .top .menu{display:inline-grid}
+  .hello h1{font-size:28px}
+  .msg.ai .body{font-size:16px}
+  .chip{max-width:150px}
+  .grid2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" id="side">
+    <div class="brand"><svg class="spark" viewBox="0 0 24 24" style="stroke-width:2.2"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/></svg>Lokale AI</div>
+    <button class="newbtn" id="newChat"></button>
+    <div class="list" id="list"></div>
+    <div class="sidefoot">
+      <div class="st" id="stSide"><i class="dot"></i><span>Niet verbonden</span></div>
+      <button class="ibtn" id="sideSet" title="Instellingen"></button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="top">
+      <button class="ibtn menu" id="menu" title="Menu"></button>
+      <div class="title" id="title"></div>
+      <button class="chip" id="chip" title="Verbinding & modelinstellingen"><i class="dot" id="chipDot"></i><span id="chipTxt">Geen model</span></button>
+      <button class="ibtn" id="dl" title="Exporteer gesprek (Markdown)"></button>
+      <button class="ibtn" id="theme" title="Thema wisselen"></button>
+      <button class="ibtn" id="topSet" title="Instellingen"></button>
+    </header>
+    <div class="scroll" id="scroll"><div class="thread" id="thread"></div></div>
+    <div class="comp">
+      <div class="box">
+        <textarea id="inp" rows="1" placeholder="Stel een vraag aan je lokale AI…" autofocus></textarea>
+        <div class="row">
+          <span class="sp"></span>
+          <button class="mdl" id="mdl" title="Instellingen openen">—</button>
+          <button class="send" id="send" title="Verzenden"></button>
+        </div>
+      </div>
+      <div class="disc">Draait lokaal via LM Studio. Antwoorden kunnen fouten bevatten.</div>
+    </div>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Instellingen">
+  <div class="dh"><h2>Instellingen</h2><button class="ibtn" id="dClose" title="Sluiten"></button></div>
+  <div class="db" id="dBody"></div>
+</aside>
+<input type="file" id="file" accept="application/json" hidden>
+
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const ic=(()=>{const d={
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+ sliders:'<path d="M4 6h9m4 0h3M4 12h3m4 0h9M4 18h11m4 0h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+ trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+ pencil:'<path d="M4 20h4L19 9l-4-4L4 16v4z"/>',
+ copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',
+ refresh:'<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
+ up:'<path d="M12 19V5M5 12l7-7 7 7"/>',
+ stop:'<rect class="sq" x="5" y="5" width="14" height="14" rx="2.5"/>',
+ moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z"/>',
+ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+ down:'<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+ upl:'<path d="M12 16V5M7 10l5-5 5 5M5 20h14"/>',
+ x:'<path d="M6 6l12 12M18 6L6 18"/>',
+ check:'<path d="M5 12l5 5 9-9"/>',
+ spark:'<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4" style="stroke-width:2.2"/>'
+};const o={};for(const k in d)o[k]=`<svg viewBox="0 0 24 24">${d[k]}</svg>`;return o})();
+
+/* ---------- opslag ---------- */
+const LS={
+  get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v,(kk,x)=>kk[0]==='_'?undefined:x))}catch{}}
+};
+const DEFAULTS={
+  baseUrl:'http://localhost:1234/v1',apiKey:'',model:'',system:'',
+  temperature:'0.7',top_p:'',top_k:'',min_p:'',max_tokens:'',frequency_penalty:'',presence_penalty:'',repeat_penalty:'',seed:'',
+  stop:'',stream:true,historyLimit:'',noThink:false,showThinking:true,enterToSend:true,extraBody:'',theme:'auto'
+};
+let S={...DEFAULTS,...LS.get('lai.settings',{})};
+let chats=LS.get('lai.chats',[]);
+let curId=LS.get('lai.cur',null);
+let busy=false,ctrl=null,models=[],conn='unknown';
+const saveS=()=>LS.set('lai.settings',S);
+const saveC=()=>{LS.set('lai.chats',chats);LS.set('lai.cur',curId)};
+const cur=()=>chats.find(c=>c.id===curId);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+/* ---------- markdown ---------- */
+function inline(raw){
+  let s=esc(raw);const codes=[];
+  s=s.replace(/`([^`\n]+)`/g,(_,c)=>{codes.push(c);return '\u0000'+(codes.length-1)+'\u0000'});
+  s=s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  s=s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+[^\s<).,;:!?])/g,'$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+  s=s.replace(/\*\*([^*\n]+)\*\*/g,'<strong>$1</strong>').replace(/__([^_\n]+)__/g,'<strong>$1</strong>');
+  s=s.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\*)/g,'$1<em>$2</em>').replace(/~~([^~\n]+)~~/g,'<del>$1</del>');
+  return s.replace(/\u0000(\d+)\u0000/g,(_,i)=>'<code>'+codes[+i]+'</code>');
+}
+const LIST_RE=/^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+function listHTML(items){
+  let h='';const st=[];
+  for(const it of items){
+    while(st.length&&st[st.length-1].lvl>it.lvl)h+='</li></'+st.pop().tag+'>';
+    if(!st.length||st[st.length-1].lvl<it.lvl){
+      const tag=it.ord?'ol':'ul';
+      h+=`<${tag}${it.ord&&it.num!==1?` start="${it.num}"`:''}><li>`;st.push({lvl:it.lvl,tag});
+    }else h+='</li><li>';
+    h+=inline(it.text);
+  }
+  while(st.length)h+='</li></'+st.pop().tag+'>';
+  return h;
+}
+function tableHTML(rows){
+  const cells=r=>r.trim().replace(/^\||\|$/g,'').split('|').map(x=>x.trim());
+  const al=cells(rows[1]).map(x=>x.startsWith(':')&&x.endsWith(':')?'center':x.endsWith(':')?'right':'');
+  const st=i=>al[i]?` style="text-align:${al[i]}"`:'';
+  return '<div class="tw"><table><thead><tr>'+cells(rows[0]).map((c,i)=>`<th${st(i)}>${inline(c)}</th>`).join('')+'</tr></thead><tbody>'+
+    rows.slice(2).map(r=>'<tr>'+cells(r).map((c,i)=>`<td${st(i)}>${inline(c)}</td>`).join('')+'</tr>').join('')+'</tbody></table></div>';
+}
+const codeHTML=b=>`<div class="code"><div class="ch"><span>${esc(b.l||'code')}</span><button data-a="cc">${ic.copy}<span>Kopiëren</span></button></div><pre><code>${esc(b.c)}</code></pre></div>`;
+function md(src){
+  const blocks=[];
+  src=src.replace(/```([^\n`]*)\n([\s\S]*?)(?:\n?```|$)/g,(_,l,c)=>{blocks.push({l:l.trim().split(/\s+/)[0],c});return '\n\u0001'+(blocks.length-1)+'\u0001\n'});
+  const L=src.split('\n'),out=[];let i=0,m;
+  const blockStart=l=>/^\u0001\d+\u0001$/.test(l)||/^#{1,6}\s/.test(l)||/^\s*>/.test(l)||LIST_RE.test(l)||/^\s*([-*_])(\s*\1){2,}\s*$/.test(l);
+  while(i<L.length){
+    const l=L[i];
+    if(!l.trim()){i++;continue}
+    if(m=l.match(/^\u0001(\d+)\u0001$/)){out.push(codeHTML(blocks[+m[1]]));i++;continue}
+    if(m=l.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/)){out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`);i++;continue}
+    if(/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)){out.push('<hr>');i++;continue}
+    if(/^\s*>/.test(l)){const q=[];while(i<L.length&&/^\s*>/.test(L[i]))q.push(L[i++].replace(/^\s*>\s?/,''));out.push('<blockquote>'+q.map(x=>inline(x)).join('<br>')+'</blockquote>');continue}
+    if(LIST_RE.test(l)){
+      const items=[];
+      while(i<L.length){
+        const mm=L[i].match(LIST_RE);
+        if(mm){items.push({lvl:Math.floor(mm[1].replace(/\t/g,'  ').length/2),ord:/\d/.test(mm[2]),num:parseInt(mm[2])||1,text:mm[3]});i++}
+        else if(!L[i].trim()&&i+1<L.length&&LIST_RE.test(L[i+1]))i++;
+        else if(/^\s{2,}\S/.test(L[i])&&items.length&&!/^\s*\u0001/.test(L[i])){items[items.length-1].text+=' '+L[i].trim();i++}
+        else break;
+      }
+      out.push(listHTML(items));continue;
+    }
+    if(l.includes('|')&&i+1<L.length&&L[i+1].includes('-')&&/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(L[i+1])){
+      const rows=[L[i],L[i+1]];i+=2;
+      while(i<L.length&&L[i].trim()&&L[i].includes('|'))rows.push(L[i++]);
+      out.push(tableHTML(rows));continue;
+    }
+    const p=[L[i++]];
+    while(i<L.length&&L[i].trim()&&!blockStart(L[i]))p.push(L[i++]);
+    out.push('<p>'+p.map(x=>inline(x)).join('<br>')+'</p>');
+  }
+  return out.join('');
+}
+
+/* ---------- <think>-blokken (Qwen3 e.d.) ---------- */
+function split(m){
+  let c=m.content||'',r=m.reasoning||'',open=false;
+  const t=c.match(/^\s*<think>([\s\S]*?)(<\/think>|$)/);
+  if(t){r=(r?r+'\n':'')+t[1];open=!t[2];c=c.slice(t[0].length)}
+  else if(c.includes('</think>')){const i=c.indexOf('</think>');r=(r?r+'\n':'')+c.slice(0,i);c=c.slice(i+8)}
+  c=c.replace(/^\s+/,'');
+  return {answer:c,think:r.trim(),thinking:open||(!!r&&!c&&!!m._live)};
+}
+
+/* ---------- rendering ---------- */
+const thread=$('#thread'),scroller=$('#scroll'),inp=$('#inp');
+function greeting(){const h=new Date().getHours();return h<6?'Goedenacht':h<12?'Goedemorgen':h<18?'Goedemiddag':'Goedenavond'}
+function aiBody(m){
+  const p=split(m);let h='';
+  if(p.think&&S.showThinking){
+    const open=m._open!==undefined?m._open:p.thinking;
+    h+=`<details class="think"${open?' open':''}><summary>${p.thinking?'Denkt na…':'Redenering'}</summary><div>${esc(p.think)}</div></details>`;
+  }
+  if(p.answer)h+=md(p.answer);
+  else if(m._live&&!p.think)h+='<span class="dots"><i></i><i></i><i></i></span>';
+  if(m.finish==='length')h+='<div class="note">Antwoord afgekapt: maximum aantal tokens bereikt. Verhoog "Max tokens" in de instellingen.</div>';
+  if(m.error)h+=`<div class="error">${esc(m.error)}</div>`;
+  return h;
+}
+function footHTML(m,i,c){
+  if(m._live)return '';
+  const last=i===c.messages.length-1;
+  let h=`<button class="ibtn" data-a="copy" title="Kopiëren">${ic.copy}</button>`;
+  if(last)h+=`<button class="ibtn" data-a="regen" title="Opnieuw genereren">${ic.refresh}</button>`;
+  if(m.stats){const s=m.stats;h+=`<span class="stats">${[s.tokens?s.tokens+' tokens':'',s.tps?s.tps.toFixed(1)+' tok/s':'',s.secs?s.secs.toFixed(1)+'s':'',m.model||''].filter(Boolean).join(' · ')}</span>`}
+  return h;
+}
+function msgHTML(m,i,c){
+  if(m.role==='user')return `<div class="msg user" data-i="${i}"><div class="bubble">${esc(m.content)}</div><div class="acts"><button class="ibtn" data-a="edit" title="Bewerken">${ic.pencil}</button><button class="ibtn" data-a="copy" title="Kopiëren">${ic.copy}</button></div></div>`;
+  return `<div class="msg ai" data-i="${i}">${ic.spark.replace('<svg','<svg class="spark"')}<div class="col"><div class="body">${aiBody(m)}</div><div class="acts foot keep">${footHTML(m,i,c)}</div></div></div>`;
+}
+function renderThread(){
+  const c=cur();
+  if(!c||!c.messages.length){
+    thread.innerHTML=`<div class="hello">${ic.spark.replace('<svg','<svg class="spark"')}<h1>${greeting()}. Waar gaan we mee aan de slag?</h1><p>Je praat met een model op je eigen computer. Niets verlaat je netwerk.</p><div class="sugg"><button>Leg iets uit alsof ik 12 ben</button><button>Help me met code schrijven</button><button>Vat een tekst samen</button><button>Brainstorm ideeën met me</button></div></div>`;
+    return;
+  }
+  thread.innerHTML=c.messages.map((m,i)=>msgHTML(m,i,c)).join('');
+}
+function renderSide(){
+  const l=chats.slice().sort((a,b)=>b.updated-a.updated);
+  $('#list').innerHTML=l.length?'<h4>Gesprekken</h4>'+l.map(c=>`<div class="item${c.id===curId?' on':''}" data-id="${c.id}"><span class="t">${esc(c.title)}</span><span class="acts"><button data-a="ren" title="Hernoemen">${ic.pencil}</button><button data-a="del" title="Verwijderen">${ic.trash}</button></span></div>`).join(''):'<p class="empty-s">Nog geen gesprekken</p>';
+  const c=cur();$('#title').textContent=c?c.title:'Nieuw gesprek';
+}
+function renderChrome(){
+  $('#newChat').innerHTML=ic.plus+'Nieuw gesprek';
+  $('#menu').innerHTML=ic.menu;$('#dl').innerHTML=ic.down;$('#topSet').innerHTML=ic.sliders;$('#sideSet').innerHTML=ic.sliders;$('#dClose').innerHTML=ic.x;
+  $('#theme').innerHTML=document.documentElement.dataset.theme==='dark'?ic.sun:ic.moon;
+  $('#send').innerHTML=busy?ic.stop:ic.up;$('#send').title=busy?'Stoppen':'Verzenden';
+  const name=S.model||'Geen model gekozen';
+  $('#chipTxt').textContent=name;$('#mdl').textContent=name;
+  $('#chipDot').className='dot '+(conn==='ok'?'ok':conn==='bad'?'bad':'');
+  const st=$('#stSide');
+  st.innerHTML=`<i class="dot ${conn==='ok'?'ok':conn==='bad'?'bad':''}"></i><span>${conn==='ok'?'Verbonden · '+esc(S.baseUrl.replace(/^https?:\/\//,'')):conn==='bad'?'Geen verbinding':'Verbinding controleren…'}</span>`;
+}
+const nearBottom=()=>scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<140;
+const toBottom=()=>{scroller.scrollTop=scroller.scrollHeight};
+
+/* ---------- thema ---------- */
+const mq=matchMedia('(prefers-color-scheme: dark)');
+function applyTheme(){
+  document.documentElement.dataset.theme=S.theme==='auto'?(mq.matches?'dark':'light'):S.theme;
+  const t=$('#theme');if(t)t.innerHTML=document.documentElement.dataset.theme==='dark'?ic.sun:ic.moon;
+}
+mq.addEventListener?.('change',applyTheme);
+
+/* ---------- verbinding ---------- */
+const base=()=>S.baseUrl.trim().replace(/\/+$/,'');
+const headers=()=>{const h={'Content-Type':'application/json'};if(S.apiKey.trim())h.Authorization='Bearer '+S.apiKey.trim();return h};
+function explain(e){
+  const msg=String(e&&e.message||e);
+  if(e instanceof TypeError||/failed to fetch|networkerror|load failed/i.test(msg)){
+    let t=`Kan geen verbinding maken met ${base()}.\n\n• Draait de LM Studio-server? (tabblad Developer → Status: Running)\n• Staat "Enable CORS" aan in de server-instellingen? (nodig als je dit bestand vanuit file:// of een andere host opent)\n• Bij gebruik vanaf een andere computer: zet "Serve on Local Network" aan en gebruik het IP-adres in de Base URL.`;
+    if(location.protocol==='https:'&&/^http:\/\//.test(base())&&!/localhost|127\.0\.0\.1/.test(base()))t+='\n• Deze pagina draait op https, maar de server op http: de browser blokkeert dat. Open chat.html lokaal.';
+    return t;
+  }
+  return msg;
+}
+async function loadModels(verbose){
+  const st=$('#cstat');
+  if(verbose&&st){st.className='cstat';st.textContent='Verbinding testen…'}
+  try{
+    const r=await fetch(base()+'/models',{headers:headers()});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const j=await r.json();
+    models=(j.data||[]).map(x=>x.id).filter(Boolean);
+    conn='ok';
+    if(!S.model&&models.length){S.model=models.find(x=>!/embed/i.test(x))||models[0];saveS()}
+    if(st){st.className='cstat ok';st.textContent=`Verbonden · ${models.length} model(len) gevonden`}
+  }catch(e){
+    conn='bad';models=[];
+    if(st){st.className='cstat bad';st.textContent=explain(e).split('\n')[0]}
+  }
+  renderChrome();renderModelChips();
+}
+
+/* ---------- genereren ---------- */
+const PARAMS=['temperature','top_p','top_k','min_p','max_tokens','frequency_penalty','presence_penalty','repeat_penalty','seed'];
+function buildBody(c){
+  let hist=c.messages.slice(0,-1).map(x=>({role:x.role,content:x.role==='assistant'?split(x).answer:x.content}));
+  hist=hist.filter(x=>!(x.role==='assistant'&&!x.content));
+  const lim=parseInt(S.historyLimit);if(lim>0)hist=hist.slice(-lim);
+  if(S.noThink&&hist.length&&hist[hist.length-1].role==='user')hist[hist.length-1]={role:'user',content:hist[hist.length-1].content+' /no_think'};
+  const msgs=(S.system.trim()?[{role:'system',content:S.system.trim()}]:[]).concat(hist);
+  const body={messages:msgs,stream:!!S.stream};
+  if(S.model)body.model=S.model;
+  if(S.stream)body.stream_options={include_usage:true};
+  for(const k of PARAMS){const v=String(S[k]).trim();if(v!==''&&!isNaN(+v))body[k]=+v}
+  const stop=S.stop.split('\n').map(x=>x.replace(/\\n/g,'\n')).filter(x=>x!=='');if(stop.length)body.stop=stop;
+  if(S.extraBody.trim()){try{Object.assign(body,JSON.parse(S.extraBody))}catch{}}
+  return body;
+}
+function setBusy(b){busy=b;$('#send').innerHTML=b?ic.stop:ic.up;$('#send').title=b?'Stoppen':'Verzenden';updSend()}
+function updSend(){$('#send').disabled=!busy&&!inp.value.trim()}
+
+async function generate(){
+  const c=cur();
+  const m={role:'assistant',content:'',reasoning:'',model:S.model,_live:true};
+  c.messages.push(m);c.updated=Date.now();saveC();renderThread();renderSide();toBottom();
+  setBusy(true);
+  const el=thread.lastElementChild,bodyEl=el.querySelector('.body');
+  let raf=0;
+  const paint=()=>{raf=0;const stick=nearBottom();bodyEl.innerHTML=aiBody(m);if(stick)toBottom()};
+  const sched=()=>{if(!raf)raf=requestAnimationFrame(paint)};
+  ctrl=new AbortController();
+  const t0=performance.now();let t1=0,chunks=0,usage=null;
+  try{
+    const res=await fetch(base()+'/chat/completions',{method:'POST',headers:headers(),body:JSON.stringify(buildBody(c)),signal:ctrl.signal});
+    if(!res.ok){
+      let t=await res.text();try{const j=JSON.parse(t);t=j.error?.message||j.error||t}catch{}
+      throw new Error(`HTTP ${res.status}: ${typeof t==='string'?t:JSON.stringify(t)}`);
+    }
+    conn='ok';
+    if(S.stream&&res.body){
+      const rd=res.body.getReader(),dec=new TextDecoder();let buf='';
+      for(;;){
+        const {done,value}=await rd.read();if(done)break;
+        buf+=dec.decode(value,{stream:true});
+        let nl;
+        while((nl=buf.indexOf('\n'))>=0){
+          const line=buf.slice(0,nl).trim();buf=buf.slice(nl+1);
+          if(!line.startsWith('data:'))continue;
+          const d=line.slice(5).trim();if(!d||d==='[DONE]')continue;
+          let j;try{j=JSON.parse(d)}catch{continue}
+          if(j.error)throw new Error(j.error.message||JSON.stringify(j.error));
+          const ch=j.choices&&j.choices[0];
+          if(ch){
+            const dl=ch.delta||{};
+            const rc=dl.reasoning_content||dl.reasoning||'';
+            if(dl.content||rc){if(!t1)t1=performance.now();chunks++;m.content+=dl.content||'';m.reasoning+=rc;sched()}
+            if(ch.finish_reason)m.finish=ch.finish_reason;
+          }
+          if(j.usage)usage=j.usage;
+        }
+      }
+    }else{
+      const j=await res.json();
+      const msg=j.choices?.[0]?.message||{};
+      m.content=msg.content||'';m.reasoning=msg.reasoning_content||msg.reasoning||'';
+      m.finish=j.choices?.[0]?.finish_reason;usage=j.usage||null;t1=t0;
+    }
+  }catch(e){
+    if(e.name!=='AbortError')m.error=explain(e),conn=e instanceof TypeError?'bad':conn;
+  }finally{
+    if(raf)cancelAnimationFrame(raf);
+    const t2=performance.now();
+    delete m._live;
+    const tokens=usage?.completion_tokens||chunks;
+    if(tokens){m.stats={tokens,secs:(t2-t0)/1000,tps:t1&&t2>t1?tokens/((t2-t1)/1000):0}}
+    if(!m.content&&!m.reasoning&&!m.error){c.messages.pop()}
+    ctrl=null;c.updated=Date.now();saveC();
+    setBusy(false);renderThread();renderSide();renderChrome();
+    if(nearBottom()||true)toBottom();
+  }
+}
+async function send(text){
+  text=text.trim();if(!text||busy)return;
+  let c=cur();
+  if(!c){c={id:uid(),title:'Nieuw gesprek',created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);curId=c.id}
+  if(!c.messages.length)c.title=text.replace(/\s+/g,' ').slice(0,48)||'Nieuw gesprek';
+  c.messages.push({role:'user',content:text});
+  inp.value='';autosize();
+  await generate();
+}
+function regenerate(){
+  if(busy)return;const c=cur();if(!c)return;
+  while(c.messages.length&&c.messages[c.messages.length-1].role==='assistant')c.messages.pop();
+  if(c.messages.length)generate();
+}
+
+/* ---------- composer ---------- */
+function autosize(){inp.style.height='auto';inp.style.height=Math.min(inp.scrollHeight,220)+'px';updSend()}
+inp.addEventListener('input',autosize);
+inp.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.isComposing){
+    const go=S.enterToSend?!e.shiftKey:(e.ctrlKey||e.metaKey);
+    if(go){e.preventDefault();send(inp.value)}
+  }
+});
+$('#send').addEventListener('click',()=>{if(busy)ctrl&&ctrl.abort();else send(inp.value)});
+
+/* ---------- thread acties ---------- */
+async function copyText(t){
+  try{await navigator.clipboard.writeText(t)}catch{
+    const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy')}catch{}a.remove();
+  }
+}
+thread.addEventListener('click',async e=>{
+  const sg=e.target.closest('.sugg button');
+  if(sg){inp.value=sg.textContent+': ';autosize();inp.focus();return}
+  const sm=e.target.closest('summary');
+  if(sm){const d=sm.parentElement,i=+sm.closest('.msg').dataset.i;cur().messages[i]._open=!d.open;return}
+  const b=e.target.closest('[data-a]');if(!b)return;
+  const a=b.dataset.a;
+  if(a==='cc'){
+    await copyText(b.closest('.code').querySelector('code').textContent);
+    const s=b.querySelector('span');s.textContent='Gekopieerd';setTimeout(()=>s.textContent='Kopiëren',1400);return;
+  }
+  const msgEl=b.closest('.msg'),i=msgEl?+msgEl.dataset.i:-1,c=cur();
+  if(a==='copy'){const m=c.messages[i];await copyText(m.role==='assistant'?split(m).answer:m.content);b.innerHTML=ic.check;setTimeout(()=>b.innerHTML=ic.copy,1200)}
+  else if(a==='regen')regenerate();
+  else if(a==='edit'&&!busy){
+    msgEl.innerHTML=`<div class="editbox"><textarea>${esc(c.messages[i].content)}</textarea><div class="row"><button class="btn" data-a="ecancel">Annuleren</button><button class="btn pri" data-a="esave">Opslaan en verzenden</button></div></div>`;
+    msgEl.style.alignItems='stretch';const t=msgEl.querySelector('textarea');t.focus();t.setSelectionRange(t.value.length,t.value.length);
+  }
+  else if(a==='ecancel')renderThread();
+  else if(a==='esave'&&!busy){
+    const v=msgEl.querySelector('textarea').value.trim();if(!v)return;
+    c.messages.length=i;c.messages.push({role:'user',content:v});generate();
+  }
+});
+
+/* ---------- sidebar ---------- */
+const sideEl=$('#side'),scrim=$('#scrim');
+function closeSide(){sideEl.classList.remove('on');if(!$('#drawer').classList.contains('on'))scrim.classList.remove('on')}
+function newChat(){
+  if(busy)return;
+  const c=cur();
+  if(c&&!c.messages.length){closeSide();inp.focus();return}
+  curId=null;saveC();renderThread();renderSide();closeSide();inp.focus();
+}
+$('#newChat').addEventListener('click',newChat);
+$('#menu').addEventListener('click',()=>{sideEl.classList.add('on');scrim.classList.add('on')});
+$('#list').addEventListener('click',e=>{
+  const it=e.target.closest('.item');if(!it)return;
+  const id=it.dataset.id,a=e.target.closest('[data-a]')?.dataset.a;
+  if(a==='del'){
+    if(!confirm('Dit gesprek verwijderen?'))return;
+    if(busy&&id===curId)ctrl&&ctrl.abort();
+    chats=chats.filter(c=>c.id!==id);if(curId===id)curId=null;saveC();renderThread();renderSide();return;
+  }
+  if(a==='ren'){
+    const c=chats.find(x=>x.id===id),t=prompt('Nieuwe naam:',c.title);
+    if(t&&t.trim()){c.title=t.trim();saveC();renderSide()}return;
+  }
+  if(busy)return;
+  curId=id;saveC();renderThread();renderSide();closeSide();toBottom();
+});
+
+/* ---------- exporteren / importeren ---------- */
+function download(name,text,type){
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+}
+$('#dl').addEventListener('click',()=>{
+  const c=cur();if(!c||!c.messages.length)return;
+  const t=`# ${c.title}\n\n`+c.messages.map(m=>`**${m.role==='user'?'Jij':'AI'}:**\n\n${m.role==='assistant'?split(m).answer:m.content}`).join('\n\n---\n\n');
+  download((c.title.replace(/[^\w\- ]+/g,'').trim()||'gesprek')+'.md',t,'text/markdown');
+});
+$('#file').addEventListener('change',async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{
+    const j=JSON.parse(await f.text());
+    const incoming=Array.isArray(j)?j:j.chats;
+    if(!Array.isArray(incoming))throw new Error();
+    const ids=new Set(chats.map(c=>c.id));let n=0;
+    for(const c of incoming){if(c&&c.id&&Array.isArray(c.messages)&&!ids.has(c.id)){chats.push({title:'Gesprek',created:Date.now(),updated:Date.now(),...c});n++}}
+    saveC();renderSide();alert(n+' gesprek(ken) geïmporteerd.');
+  }catch{alert('Ongeldig bestand.')}
+});
+
+/* ---------- instellingen ---------- */
+const NUM=[
+  ['temperature','Temperature','Hoger = creatiever, lager = voorspelbaarder. Typisch 0.6–0.8.',.05],
+  ['top_p','Top P','Nucleus sampling. Leeg = niet meesturen (bijv. 0.8–0.95).',.05],
+  ['top_k','Top K','Beperk tot de K meest waarschijnlijke tokens (bijv. 20–40).',1],
+  ['min_p','Min P','Minimale kans t.o.v. het beste token (bijv. 0.05).',.01],
+  ['max_tokens','Max tokens','Maximale lengte van het antwoord. Leeg of -1 = onbeperkt.',1],
+  ['repeat_penalty','Repeat penalty','Straf voor herhaling (LM Studio/llama.cpp), bijv. 1.1.',.01],
+  ['frequency_penalty','Frequency penalty','OpenAI-stijl, -2 t/m 2.',.1],
+  ['presence_penalty','Presence penalty','OpenAI-stijl, -2 t/m 2.',.1],
+  ['seed','Seed','Vaste seed voor reproduceerbare antwoorden.',1],
+];
+const num=(k,l,h,step)=>`<div class="fld"><label for="f_${k}">${l}</label><input type="number" id="f_${k}" data-k="${k}" step="${step}" placeholder="standaard" value="${esc(S[k])}"><div class="h">${h}</div></div>`;
+const chk=(k,t,d)=>`<label class="chk"><input type="checkbox" data-k="${k}"${S[k]?' checked':''}><span><b>${t}</b><small>${d}</small></span></label>`;
+function renderDrawer(){
+  $('#dBody').innerHTML=`
+  <h3>Verbinding</h3>
+  <div class="fld"><label for="f_baseUrl">Base URL</label><input type="text" id="f_baseUrl" data-k="baseUrl" value="${esc(S.baseUrl)}" spellcheck="false"><div class="h">LM Studio standaard: <code>http://localhost:1234/v1</code>. Andere pc op je netwerk: <code>http://192.168.x.x:1234/v1</code>.</div></div>
+  <div class="fld"><label for="f_apiKey">API-sleutel</label><input type="password" id="f_apiKey" data-k="apiKey" value="${esc(S.apiKey)}" autocomplete="off" placeholder="optioneel"><div class="h">LM Studio vraagt er normaal geen. Wordt als Bearer-token meegestuurd.</div></div>
+  <div class="fld"><label for="f_model">Model</label><input type="text" id="f_model" data-k="model" value="${esc(S.model)}" spellcheck="false" placeholder="bijv. qwen3-8b"><div class="mods" id="mods"></div><div class="h">Leeg = het model dat in LM Studio geladen is.</div></div>
+  <div class="rowb"><button class="btn pri" id="test">Test verbinding</button><span class="cstat" id="cstat"></span></div>
+
+  <h3>Systeemprompt</h3>
+  <div class="fld"><textarea id="f_system" data-k="system" placeholder="Bijv. Je bent een behulpzame assistent die in het Nederlands antwoordt.">${esc(S.system)}</textarea></div>
+
+  <h3>Sampling</h3>
+  <div class="grid2">${NUM.map(n=>num(...n)).join('')}</div>
+  <div class="fld"><label for="f_stop">Stopsequenties</label><textarea id="f_stop" data-k="stop" class="code-t" placeholder="één per regel" style="min-height:64px">${esc(S.stop)}</textarea><div class="h">Generatie stopt zodra een van deze teksten verschijnt.</div></div>
+
+  <h3>Gedrag</h3>
+  ${chk('stream','Streamen','Toon het antwoord woord voor woord terwijl het binnenkomt.')}
+  ${chk('showThinking','Redenering tonen','Toon &lt;think&gt;-blokken (Qwen3 e.d.) in een uitklapbaar blok.')}
+  ${chk('noThink','Denkmodus uitzetten (Qwen3)','Voegt <code>/no_think</code> toe aan je laatste bericht voor snellere antwoorden.')}
+  ${chk('enterToSend','Enter verzendt','Aan: Enter verzendt, Shift+Enter nieuwe regel. Uit: Ctrl/Cmd+Enter verzendt.')}
+  <div class="fld"><label for="f_historyLimit">Max. berichten meesturen</label><input type="number" id="f_historyLimit" data-k="historyLimit" min="1" step="1" placeholder="alles" value="${esc(S.historyLimit)}"><div class="h">Beperk de context tot de laatste N berichten. Leeg = het hele gesprek.</div></div>
+  <div class="fld"><label for="f_theme">Thema</label><select id="f_theme" data-k="theme"><option value="auto">Automatisch</option><option value="light">Licht</option><option value="dark">Donker</option></select></div>
+
+  <h3>Geavanceerd</h3>
+  <div class="fld"><label for="f_extraBody">Extra JSON in het verzoek</label><textarea id="f_extraBody" data-k="extraBody" class="code-t" spellcheck="false" placeholder='{"chat_template_kwargs": {"enable_thinking": false}}'>${esc(S.extraBody)}</textarea><div class="h">Wordt samengevoegd met de request-body van <code>/chat/completions</code> en overschrijft bovenstaande waarden.</div></div>
+
+  <h3>Gegevens</h3>
+  <div class="rowb">
+    <button class="btn" id="exp">Alles exporteren</button><button class="btn" id="imp">Importeren</button>
+    <button class="btn danger" id="wipe">Alle gesprekken wissen</button><button class="btn danger" id="reset">Standaardwaarden</button>
+  </div>
+  <p class="h" style="margin-top:12px;color:var(--mut);font-size:12.5px">Alles wordt opgeslagen in de localStorage van deze browser; er wordt niets naar een externe server gestuurd.</p>`;
+  $('#f_theme').value=S.theme;
+  renderModelChips();
+}
+function renderModelChips(){
+  const el=$('#mods');if(!el)return;
+  el.innerHTML=models.map(m=>`<button data-m="${esc(m)}" class="${m===S.model?'on':''}">${esc(m)}</button>`).join('');
+}
+function validateExtra(){
+  const t=$('#f_extraBody');if(!t)return;
+  let ok=true;if(S.extraBody.trim()){try{const v=JSON.parse(S.extraBody);ok=v&&typeof v==='object'&&!Array.isArray(v)}catch{ok=false}}
+  t.classList.toggle('bad',!ok);
+}
+let connTimer=0;
+$('#dBody').addEventListener('input',e=>{
+  const k=e.target.dataset.k;if(!k)return;
+  S[k]=e.target.type==='checkbox'?e.target.checked:e.target.value;
+  saveS();
+  if(k==='theme')applyTheme();
+  if(k==='extraBody')validateExtra();
+  if(k==='model'){renderChrome();renderModelChips()}
+  if(k==='baseUrl'||k==='apiKey'){conn='unknown';renderChrome();clearTimeout(connTimer);connTimer=setTimeout(()=>loadModels(true),700)}
+});
+$('#dBody').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.m){S.model=b.dataset.m;saveS();$('#f_model').value=S.model;renderChrome();renderModelChips()}
+  else if(b.id==='test')loadModels(true);
+  else if(b.id==='exp')download('lokale-ai-gesprekken.json',JSON.stringify({version:1,exported:new Date().toISOString(),chats},null,1),'application/json');
+  else if(b.id==='imp')$('#file').click();
+  else if(b.id==='wipe'){if(confirm('ALLE gesprekken definitief wissen?')){if(busy&&ctrl)ctrl.abort();chats=[];curId=null;saveC();renderThread();renderSide()}}
+  else if(b.id==='reset'){if(confirm('Alle instellingen terugzetten naar standaard?')){S={...DEFAULTS};saveS();applyTheme();renderDrawer();renderChrome();loadModels(true)}}
+});
+function openDrawer(){renderDrawer();validateExtra();$('#drawer').classList.add('on');scrim.classList.add('on');if(conn!=='ok')loadModels(false)}
+function closeDrawer(){$('#drawer').classList.remove('on');if(!sideEl.classList.contains('on'))scrim.classList.remove('on');clearTimeout(connTimer);if(conn!=='ok')loadModels(false)}
+['#topSet','#sideSet','#chip','#mdl'].forEach(s=>$(s).addEventListener('click',()=>{closeSide();openDrawer()}));
+$('#dClose').addEventListener('click',closeDrawer);
+scrim.addEventListener('click',()=>{closeDrawer();closeSide();scrim.classList.remove('on')});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();closeSide()}});
+$('#theme').addEventListener('click',()=>{S.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';saveS();applyTheme()});
+
+/* ---------- start ---------- */
+if(!chats.some(c=>c.id===curId))curId=null;
+applyTheme();renderChrome();renderSide();renderThread();updSend();
+loadModels(false);
+</script>
+</body>
+</html>
