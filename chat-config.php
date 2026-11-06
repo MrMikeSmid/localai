@@ -1,6 +1,6 @@
 <?php
 /**
- * Gedeelde instellingen voor chat.html.
+ * Gedeelde instellingen voor de chatpagina (index.html).
  *
  * GET  -> { ok, configured, config }          (voor iedereen leesbaar)
  * POST -> { action: verify|save|clear, password, newPassword?, config? }

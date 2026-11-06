@@ -2,129 +2,1007 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Midterm Dashboard 2026</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Rivsenn A.I. · Chat</title>
+<script>try{var t=localStorage.getItem('rv-theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--ink:#14181f;--mut:#5b6572;--line:#e2e6ec;--d:#2563eb;--r:#dc2626}
-@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--card:#171b22;--ink:#e8ecf2;--mut:#9aa5b4;--line:#262c36;--d:#60a5fa;--r:#f87171}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
-main{max-width:1000px;margin:0 auto;padding:20px 16px 48px}
-header{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline}
-h1{font-size:22px;margin:0}h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:28px 0 10px}
-.sub,.note{color:var(--mut);font-size:13px}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#16a34a;margin-right:6px}.dot.bad{background:#dc2626}
-.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
-.card h3{margin:0 0 10px;font-size:15px}
-.big{display:flex;justify-content:space-between;font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
-.big span:first-child{color:var(--d)}.big span:last-child{color:var(--r)}
-.lab{display:flex;justify-content:space-between;font-size:12px;color:var(--mut)}
-.baro{position:relative;display:flex;height:22px;border-radius:11px;overflow:hidden;margin:8px 0 4px;background:var(--line)}
-.baro i{display:block;height:100%}.baro .d{background:var(--d)}.baro .r{background:var(--r);margin-left:auto}
-.maj{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);left:50%}
-.waffle{display:grid;gap:3px;margin:12px 0 4px}
-.waffle b{aspect-ratio:1;border-radius:2px;background:var(--line)}.waffle .d{background:var(--d)}.waffle .r{background:var(--r)}
-.feed a{color:var(--ink);text-decoration:none}.feed a:hover{text-decoration:underline}
-.meta{font-size:12px;color:var(--mut);margin-top:2px}.src{font-weight:600}
-.err{color:var(--r)}
-.feed{padding:4px 14px}
-.feed .item{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
-.feed .item:first-child{border-top:0}
-.av{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff;background:#64748b}
-.body{min-width:0;flex:1}
-.top{display:flex;gap:6px;align-items:baseline;font-size:13px}.top b{font-weight:700}.top span{color:var(--mut)}
-.txt{margin:3px 0 0;font-size:14px;line-height:1.45;white-space:pre-line;overflow-wrap:anywhere}
-.txt.clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.more{background:none;border:0;padding:4px 0 0;color:var(--d);font:inherit;font-size:13px;cursor:pointer}
-.head{font-size:15px;font-weight:600;line-height:1.35;color:var(--ink)}
-.chip{display:inline-block;font-size:11px;font-weight:700;color:#fff;padding:1px 7px;border-radius:10px}
-.xcard{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
-.btn{background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px}
+/* Rivsenn A.I. · papier-stijl (tokens uit de overdracht) */
+:root{
+  --bg:#F1ECE3;--card:#F7F3EC;--soft:rgba(38,34,30,.06);--fg:#26221E;--muted:#6B645A;--faint:#B5AC9E;--line:#DCD4C6;
+  --pill:rgba(247,243,236,.88);--btn:#26221E;--btn-fg:#F7F3EC;--input:#FBF8F3;--scrim:rgba(241,236,227,.6);
+  --shadow:0 8px 30px rgba(38,34,30,.08);--clay:#B4683F;--ok:#3D8B5A;--err:#B4483A;--errbg:rgba(180,72,58,.08);
+  --font-display:"Geist","Helvetica Neue",Arial,sans-serif;
+  --font-body:"Geist Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#131211;--card:#1C1A18;--soft:rgba(236,230,219,.07);--fg:#ECE6DB;--muted:#A69E91;--faint:#4E4943;--line:#2F2C28;
+  --pill:rgba(28,26,24,.88);--btn:#ECE6DB;--btn-fg:#131211;--input:#161513;--scrim:rgba(19,18,17,.6);
+  --shadow:0 8px 30px rgba(0,0,0,.4);--errbg:rgba(180,72,58,.16);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#131211;--card:#1C1A18;--soft:rgba(236,230,219,.07);--fg:#ECE6DB;--muted:#A69E91;--faint:#4E4943;--line:#2F2C28;
+  --pill:rgba(28,26,24,.88);--btn:#ECE6DB;--btn-fg:#131211;--input:#161513;--scrim:rgba(19,18,17,.6);
+  --shadow:0 8px 30px rgba(0,0,0,.4);--errbg:rgba(180,72,58,.16);color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.75 var(--font-body);-webkit-font-smoothing:antialiased;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--clay);outline-offset:2px;border-radius:6px}
+h1,h2,h3{font-family:var(--font-display);font-weight:400;letter-spacing:-.03em;line-height:1.08;text-wrap:balance;margin:0}
+svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+code{font-family:var(--font-body)}
+.gutter{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:760px;margin:0 auto}
+.muted{color:var(--muted)}
+
+/* kop: zwevende pil met tegelmenu */
+.top{position:fixed;inset:0 0 auto 0;z-index:30;padding-top:max(12px,env(safe-area-inset-top,0px))}
+.pill{background:var(--pill);border:1px solid var(--line);border-radius:22px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:var(--shadow);overflow:hidden}
+.pill-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 8px 8px 16px}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo svg{width:26px;height:26px;stroke:none;transition:opacity .25s}
+.logo span{font-family:var(--font-display);font-weight:500;font-size:17px;letter-spacing:-.02em}
+.logo .tile{fill:var(--fg)}.logo .letter{stroke:var(--bg);stroke-width:10;fill:none}.logo .leg{fill:var(--bg)}
+.logo.has-orb svg{opacity:0}
+.pill-actions{display:flex;align-items:center;gap:4px}
+.icon-btn{width:44px;height:44px;border-radius:50%;background:var(--soft);display:flex;align-items:center;justify-content:center}
+.menu-btn{height:44px;padding:0 14px;border-radius:14px;display:flex;align-items:center;gap:8px;font-size:13px}
+.menu-btn .i-close,.menu-open .menu-btn .i-open{display:none}.menu-open .menu-btn .i-close{display:block}
+.theme-btn .i-sun{display:none}.is-dark .theme-btn .i-sun{display:block}.is-dark .theme-btn .i-moon{display:none}
+.pill-menu{display:grid;grid-template-rows:0fr;transition:grid-template-rows .28s ease}
+.menu-open .pill-menu{grid-template-rows:1fr}
+.pill-menu>div{overflow:hidden}
+.pill-menu-inner{padding:4px 10px 12px;display:flex;flex-direction:column;gap:10px}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tile-link{display:flex;flex-direction:column;justify-content:space-between;gap:14px;min-height:96px;padding:14px;border-radius:16px;background:var(--soft);text-align:left;transition:transform .15s ease}
+.tile-link:hover{transform:translateY(-2px)}
+.tile-link .t-top{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.tile-link .t-name{font-family:var(--font-display);font-size:20px;font-weight:500;letter-spacing:-.02em;line-height:1.1;display:block}
+.tile-link .t-sub{font-size:11.5px;color:var(--muted);line-height:1.35;display:block;margin-top:2px}
+.convs{max-height:min(34vh,280px);overflow:auto;border-top:1px solid var(--line)}
+.convs h4{margin:12px 6px 4px;font:400 12px var(--font-body);color:var(--muted)}
+.item{display:flex;align-items:center;gap:4px;padding:6px 4px 6px 8px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
+.item:hover{background:var(--soft)}
+.item.on .t::before{content:"";display:inline-block;width:7px;height:7px;background:var(--clay);margin-right:9px;vertical-align:1px}
+.item .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .acts{display:flex}
+.item .acts button{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;color:var(--muted)}
+.item .acts button:hover{background:var(--soft);color:var(--fg)}
+.item .acts svg{width:15px;height:15px}
+.empty-s{color:var(--muted);padding:12px 8px;font-size:13px;margin:0}
+.menu-foot{display:flex;align-items:center;gap:8px;padding:10px 6px 0;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none}.dot.ok{background:var(--ok)}.dot.bad{background:var(--err)}
+.scrim{position:fixed;inset:0;z-index:25;background:var(--scrim);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.on{opacity:1;pointer-events:auto}
+body.drawer-open .scrim{z-index:55}
+
+/* pagina */
+.app{display:flex;flex-direction:column;height:100dvh}
+.scroll{flex:1;overflow:auto;padding-top:calc(84px + env(safe-area-inset-top,0px))}
+.thread{padding:8px 0 40px}
+.hero{padding-top:8px}
+.orb-spot{position:relative;height:clamp(170px,28vh,300px);pointer-events:none}
+canvas.orb{position:fixed;left:0;top:0;width:320px;height:320px;transform-origin:0 0;pointer-events:none;z-index:35;display:block;will-change:transform}
+.hero h1{font-size:clamp(34px,6vw,54px);letter-spacing:-.035em}
+.hero .intro{margin:18px 0 0;max-width:34em;font-size:15px;color:var(--muted)}
+.sugg{margin-top:24px;display:flex;flex-wrap:wrap;gap:8px}
+.chip,.sugg button{display:inline-flex;align-items:center;padding:7px 14px;border:1px solid var(--line);border-radius:999px;font-size:12.5px;color:var(--fg)}
+.sugg button:hover{border-color:var(--fg)}
+
+/* berichten */
+.msg{margin:26px 0;position:relative}
+.msg.user{display:flex;flex-direction:column;align-items:flex-end}
+.msg.user .bubble{background:var(--soft);border-radius:16px;padding:10px 16px;max-width:88%;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg .acts{display:flex;gap:2px;margin-top:4px;opacity:0;transition:opacity .15s}
+.msg:hover .acts,.msg:last-child .acts,.msg.ai .acts.keep{opacity:1}
+.ibtn{width:34px;height:34px;border-radius:50%;display:inline-grid;place-items:center;color:var(--muted)}
+.ibtn:hover{background:var(--soft);color:var(--fg)}
+.acts .ibtn{width:32px;height:32px}.acts .ibtn svg{width:16px;height:16px}
+.msg.ai .body{overflow-wrap:anywhere}
+.stats{font-size:12px;color:var(--muted);margin:2px 8px 0 6px;align-self:center}
+.foot{display:flex;align-items:center;flex-wrap:wrap}
+.editbox{width:100%;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px}
+.editbox textarea{width:100%;min-height:90px;border:0;outline:0;resize:vertical;background:none;color:inherit;font:16px/1.6 var(--font-body)}
+.editbox .row{display:flex;gap:8px;justify-content:flex-end}
+.btn{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:0 18px;border-radius:999px;border:1px solid var(--line);font-size:13px}
+.btn:hover{border-color:var(--fg)}
+.btn.pri{background:var(--btn);color:var(--btn-fg);border-color:var(--btn)}
+.btn.danger{color:var(--err)}.btn.danger:hover{border-color:var(--err)}
+
+/* markdown */
+.body>*:first-child{margin-top:0}.body>*:last-child{margin-bottom:0}
+.body p{margin:0 0 1em}
+.body h1,.body h2,.body h3,.body h4{line-height:1.2;margin:1.5em 0 .5em}
+.body h1{font-size:1.9em}.body h2{font-size:1.55em}.body h3{font-size:1.25em}.body h4,.body h5,.body h6{font-size:1.05em;font-weight:500}
+.body ul,.body ol{margin:0 0 1em;padding-left:1.4em}.body li{margin:.25em 0}.body li>ul,.body li>ol{margin:.25em 0}
+.body ul li::marker{color:var(--clay)}.body ol li::marker{color:var(--muted)}
+.body a{text-decoration:underline;text-decoration-color:var(--clay);text-underline-offset:3px}
+.body blockquote{margin:0 0 1em;padding:.1em 0 .1em 1em;border-left:2px solid var(--line);color:var(--muted)}
+.body hr{border:0;border-top:1px solid var(--line);margin:1.6em 0}
+.body code{font-size:.9em;background:var(--soft);padding:.12em .4em;border-radius:6px}
+.code{margin:0 0 1.1em;background:var(--card);border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+.code .ch{display:flex;justify-content:space-between;align-items:center;padding:4px 8px 4px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)}
+.code .ch button{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px}.code .ch button:hover{background:var(--soft);color:var(--fg)}
+.code .ch svg{width:14px;height:14px}
+.code pre{margin:0;padding:12px 14px;overflow:auto}
+.code pre code{background:none;padding:0;font-size:13px;line-height:1.6;white-space:pre}
+.tw{overflow:auto;margin:0 0 1em}
+.body table{border-collapse:collapse;font-size:13.5px}
+.body th,.body td{border:1px solid var(--line);padding:6px 12px}.body th{background:var(--card);text-align:left;font-weight:500}
+.think{margin:0 0 1em;font-size:13px;line-height:1.65;color:var(--muted)}
+.think summary{cursor:pointer;user-select:none;padding:2px 0}
+.think div{white-space:pre-wrap;border-left:2px solid var(--line);padding:4px 0 4px 12px;margin:6px 0 0}
+.dots{display:inline-flex;gap:5px;padding:8px 0}.dots i{width:7px;height:7px;border-radius:50%;background:var(--clay);animation:b 1.2s infinite ease-in-out}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes b{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+.error{margin-top:8px;padding:12px 16px;border:1px solid var(--err);border-radius:14px;background:var(--errbg);color:var(--err);font-size:13px;line-height:1.6;white-space:pre-wrap}
+.note{margin-top:8px;font-size:12.5px;color:var(--muted)}
+
+/* invoer */
+.comp{padding-bottom:max(14px,env(safe-area-inset-bottom,0px))}
+.box{background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:12px 10px 10px 18px;display:flex;flex-direction:column;gap:6px}
+.box:focus-within{border-color:var(--fg)}
+.box textarea{border:0;outline:0;resize:none;background:none;color:inherit;font:16px/1.6 var(--font-body);max-height:220px;min-height:28px;padding:2px 0}
+.box .row{display:flex;align-items:center;gap:8px}.box .row .sp{flex:1}
+.box .mdl{font-size:12px;color:var(--muted);padding:6px 10px;border-radius:999px;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.box .mdl:hover{background:var(--soft);color:var(--fg)}
+.send{width:44px;height:44px;border-radius:50%;background:var(--btn);color:var(--btn-fg);display:grid;place-items:center}
+.send:disabled{opacity:.3;cursor:default}
+.send svg{stroke-width:2.2}.send .sq{fill:currentColor;stroke:none;width:14px;height:14px}
+.disc{text-align:center;font-size:11.5px;color:var(--muted);margin-top:8px}
+
+/* instellingen */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100%);background:var(--bg);border-left:1px solid var(--line);z-index:60;transform:translateX(100%);transition:transform .22s;display:flex;flex-direction:column;box-shadow:-8px 0 32px rgba(0,0,0,.12)}
+.drawer.on{transform:none}
+.dh{display:flex;align-items:center;justify-content:space-between;padding:max(14px,env(safe-area-inset-top,0px)) 14px 14px 20px;border-bottom:1px solid var(--line)}
+.dh h2{font-size:26px}
+.db{flex:1;overflow:auto;padding:6px 20px 32px}
+.db h3{font:500 12px var(--font-body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:30px 0 12px;padding-top:18px;border-top:1px solid var(--line)}
+.db h3:first-child{border-top:0;padding-top:0;margin-top:18px}
+.fld{margin:0 0 16px}
+.fld label{display:block;font-size:13px;margin-bottom:6px}
+.fld .h{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.55}
+.fld input[type=text],.fld input[type=password],.fld input[type=number],.fld textarea,.fld select{width:100%;min-height:46px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--input);color:var(--fg);font:16px var(--font-body);outline:0}
+.fld input:focus,.fld textarea:focus,.fld select:focus{border-color:var(--fg)}
+.fld textarea{min-height:96px;resize:vertical;line-height:1.55}
+.fld textarea.code-t{font-size:13px;min-height:84px}
+.fld .bad{border-color:var(--err)!important}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.chk{display:flex;gap:12px;align-items:flex-start;margin:0 0 14px;cursor:pointer}
+.chk input{margin-top:4px;accent-color:var(--fg);width:18px;height:18px}
+.chk b{font-weight:500;display:block;font-size:13px}.chk small{color:var(--muted);font-size:12px;display:block;line-height:1.5}
+.rowb{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.cstat{font-size:12.5px;color:var(--muted)}.cstat.ok{color:var(--ok)}.cstat.bad{color:var(--err)}
+.mods{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.mods button{padding:5px 12px;border-radius:999px;border:1px solid var(--line);font-size:12px}
+.mods button:hover{border-color:var(--fg)}.mods button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+
+@media(max-width:520px){.tile-link .t-name{font-size:17px}.tile-link{padding:12px;min-height:88px}.grid2{grid-template-columns:1fr}.menu-btn{padding:0 10px}}
 </style>
-</head><body>
-<main>
-<header><h1>Midterm Dashboard 2026</h1><div class="sub"><span class="dot" id="dot"></span><span id="status">Laden…</span></div></header>
-<p class="note">Live cijfers zijn <b>voorspelmarkt-kansen en projecties</b> (Polymarket, zonder API-sleutel), elke 30 seconden ververst. Dit zijn geen officiële uitslagen; de zetels zijn de verwachte waarde uit de markten. Check AP of de kiesraad van de staat voor officiële resultaten.</p>
+</head>
+<body>
+<header class="top gutter" id="top-bar">
+  <div class="wrap pill">
+    <div class="pill-bar">
+      <a class="logo" href="./" aria-label="Rivsenn A.I.">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><rect class="tile" width="64" height="64" rx="12"/><path class="letter" d="M21 50V19H37A8.5 8.5 0 0 1 37 36H21"/><polygon class="leg" points="30,36 41,36 52,50 41,50"/><rect x="51" y="5" width="8" height="8" fill="#B4683F"/></svg>
+        <span aria-hidden="true">Rivsenn</span>
+      </a>
+      <div class="pill-actions">
+        <button class="icon-btn theme-btn" type="button" id="theme" aria-label="Thema wisselen">
+          <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+          <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <button class="menu-btn" type="button" id="menu-btn" aria-expanded="false" aria-controls="pill-menu" aria-label="Menu openen">
+          <span id="menu-text">Menu</span>
+          <svg class="i-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 16h16"/></svg>
+          <svg class="i-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+    </div>
+    <nav class="pill-menu" id="pill-menu" aria-label="Menu">
+      <div><div class="pill-menu-inner">
+        <div class="tiles">
+          <button class="tile-link" type="button" id="newChat"><span class="t-top"><span>01</span><span aria-hidden="true">+</span></span><span><span class="t-name">Nieuw</span><span class="t-sub">Nieuw gesprek</span></span></button>
+          <button class="tile-link" type="button" id="menuSet"><span class="t-top"><span>02</span><span aria-hidden="true">↗</span></span><span><span class="t-name">Instellingen</span><span class="t-sub">Model &amp; parameters</span></span></button>
+          <button class="tile-link" type="button" id="dl"><span class="t-top"><span>03</span><span aria-hidden="true">↓</span></span><span><span class="t-name">Exporteer</span><span class="t-sub">Als Markdown</span></span></button>
+        </div>
+        <div class="convs" id="list"></div>
+        <div class="menu-foot" id="stSide"><i class="dot"></i><span>Verbinding controleren…</span></div>
+      </div></div>
+    </nav>
+  </div>
+</header>
+<div class="scrim" id="scrim"></div>
 
-<h2>Zetels (projectie)</h2>
-<div class="grid" id="seats"></div>
+<div class="app">
+  <div class="scroll" id="scroll">
+    <div class="gutter"><div class="wrap">
+      <section class="hero" id="hero">
+        <div class="orb-spot" id="orb-spot"></div>
+        <canvas class="orb" id="orb" aria-hidden="true"></canvas>
+        <h1>Hoi, waar kan ik je mee helpen?</h1>
+        <p class="intro">Ik draai op een eigen, lokaal taalmodel. Stel een vraag of kies een start.</p>
+        <div class="sugg"><button>Leg iets uit alsof ik 12 ben</button><button>Help me met code schrijven</button><button>Vat een tekst samen</button><button>Brainstorm ideeën met me</button></div>
+      </section>
+      <div class="thread" id="thread"></div>
+    </div></div>
+  </div>
+  <div class="comp gutter"><div class="wrap">
+    <div class="box">
+      <textarea id="inp" rows="1" placeholder="Stel een vraag…" autofocus></textarea>
+      <div class="row">
+        <span class="sp"></span>
+        <button class="mdl" id="mdl" title="Instellingen openen">—</button>
+        <button class="send" id="send" title="Verzenden" aria-label="Verzenden"></button>
+      </div>
+    </div>
+    <div class="disc">Rivsenn A.I. · draait lokaal via LM Studio. Antwoorden kunnen fouten bevatten.</div>
+  </div></div>
+</div>
 
-<h2>Kans op meerderheid</h2>
-<div class="grid" id="control"></div>
+<aside class="drawer" id="drawer" aria-label="Instellingen">
+  <div class="dh"><h2>Instellingen</h2><button class="ibtn" id="dClose" title="Sluiten" aria-label="Sluiten"></button></div>
+  <div class="db" id="dBody"></div>
+</aside>
+<input type="file" id="file" accept="application/json" hidden>
 
-<h2>Posts op X — @realDonaldTrump</h2>
-<div class="card xcard"><div><b>X-posts kunnen hier niet live getoond worden</b><div class="meta">X geeft zonder betaalde API-sleutel geen posts vrij aan een website; de ingesloten widget wordt geblokkeerd.</div></div><a class="btn" href="https://x.com/realDonaldTrump" target="_blank" rel="noopener">Open op X</a></div>
-
-<h2>Laatste Truth Social-posts — Donald Trump · <a href="https://truthsocial.com/@realDonaldTrump" target="_blank" rel="noopener" style="color:inherit">bekijk op Truth Social</a></h2>
-<div class="card feed" id="truth">Laden…</div>
-
-<h2>Laatste nieuws — Amerikaanse zenders</h2>
-<div class="card feed" id="news">Laden…</div>
-</main>
 <script>
-const API="https://gamma-api.polymarket.com/events?slug=";
-const R2J="https://api.rss2json.com/v1/api.json?rss_url=";
-const $=id=>document.getElementById(id);
-const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const safe=u=>/^https?:\/\//.test(u||"")?u:"#";
-const yes=m=>{try{return +JSON.parse(m.outcomePrices)[0]}catch(e){return null}};
-const pct=p=>p==null?"–":(p*100).toFixed(p<.1?1:0)+"%";
-async function ev(slug){const r=await fetch(API+slug);if(!r.ok)throw new Error(slug+" HTTP "+r.status);const j=await r.json();if(!j[0])throw new Error(slug+" niet gevonden");return j[0]}
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const ic=(()=>{const d={
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+ sliders:'<path d="M4 6h9m4 0h3M4 12h3m4 0h9M4 18h11m4 0h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+ trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+ pencil:'<path d="M4 20h4L19 9l-4-4L4 16v4z"/>',
+ copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',
+ refresh:'<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
+ up:'<path d="M12 19V5M5 12l7-7 7 7"/>',
+ stop:'<rect class="sq" x="5" y="5" width="14" height="14" rx="2.5"/>',
+ moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z"/>',
+ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+ down:'<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+ upl:'<path d="M12 16V5M7 10l5-5 5 5M5 20h14"/>',
+ x:'<path d="M6 6l12 12M18 6L6 18"/>',
+ check:'<path d="M5 12l5 5 9-9"/>',
+ spark:'<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4" style="stroke-width:2.2"/>'
+};const o={};for(const k in d)o[k]=`<svg viewBox="0 0 24 24">${d[k]}</svg>`;return o})();
 
-// verwachte Republikeinse zetels uit de bucket-markten (middelpunt per bucket)
-function expectedR(e,mids){let sp=0,s=0;for(const m of e.markets){const p=yes(m),k=m.groupItemTitle;if(p==null||!(k in mids))continue;sp+=p;s+=p*mids[k]}if(!sp)throw new Error("geen zetel-data");return s/sp}
-const HOUSE_MIDS={"Below 190":185,"190-194":192,"195-199":197,"200-204":202,"205-209":207,"210-214":212,"215-219":217,"220-224":222,"225-229":227,"230+":232};
-const SENATE_MIDS={"≤47":46,"48":48,"49":49,"50":50,"51":51,"52":52,"53":53,"54":54,"55":55,"56":56,"57+":57};
+/* ---------- opslag ---------- */
+const LS={
+  get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v,(kk,x)=>kk[0]==='_'?undefined:x))}catch{}}
+};
+const DEFAULTS={
+  baseUrl:'http://localhost:1234/v1',apiKey:'',model:'',system:'',
+  temperature:'0.7',top_p:'',top_k:'',min_p:'',max_tokens:'',frequency_penalty:'',presence_penalty:'',repeat_penalty:'',seed:'',
+  stop:'',stream:true,historyLimit:'',noThink:false,showThinking:true,enterToSend:true,extraBody:'',theme:'auto'
+};
+let S={...DEFAULTS,...LS.get('lai.settings',{})};
+let chats=LS.get('lai.chats',[]);
+let curId=LS.get('lai.cur',null);
+let busy=false,ctrl=null,models=[],conn='unknown';
+const saveS=()=>LS.set('lai.settings',S);
+const saveC=()=>{LS.set('lai.chats',chats);LS.set('lai.cur',curId)};
+const cur=()=>chats.find(c=>c.id===curId);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
-function seatCard(title,total,r,cols,majority){
- const rs=Math.round(r),ds=total-rs;
- let blocks="";for(let i=0;i<total;i++)blocks+=`<b class="${i<ds?"d":"r"}" title="${i<ds?"Democraten":"Republikeinen"}"></b>`;
- const lead=ds>rs?"Democraten":rs>ds?"Republikeinen":"Gelijk";
- return `<div class="card"><h3>${esc(title)}</h3>
- <div class="big"><span>${ds}</span><span>${rs}</span></div>
- <div class="baro"><i class="d" style="width:${ds/total*100}%"></i><i class="r" style="width:${rs/total*100}%"></i><span class="maj" style="left:${majority/total*100}%"></span></div>
- <div class="lab"><span>Democraten</span><span>${esc(lead)} · meerderheid ${majority}</span><span>Republikeinen</span></div>
- <div class="waffle" style="grid-template-columns:repeat(${cols},1fr)">${blocks}</div></div>`}
-function party(e){let d=null,r=null;for(const m of e.markets){const q=m.question||"";if(q.includes("Democrat"))d=yes(m);else if(q.includes("Republican"))r=yes(m)}return[d,r]}
-function duel(title,d,r){const t=(d||0)+(r||0)||1,dw=(d||0)/t*100;
- return `<div class="card"><h3>${esc(title)}</h3><div class="big"><span>${pct(d)}</span><span>${pct(r)}</span></div>
- <div class="baro"><i class="d" style="width:${dw}%"></i><i class="r" style="width:${100-dw}%"></i></div>
- <div class="lab"><span>Democraten</span><span>Republikeinen</span></div></div>`}
-
-async function refreshSeats(){
- const [hs,ss,h,s]=await Promise.all([ev("republican-house-seats-after-the-2026-midterm-elections"),ev("republican-senate-seats-after-the-2026-midterm-elections-927"),ev("which-party-will-win-the-house-in-2026"),ev("which-party-will-win-the-senate-in-2026")]);
- $("seats").innerHTML=seatCard("Huis van Afgevaardigden (435)",435,expectedR(hs,HOUSE_MIDS),29,218)+seatCard("Senaat (100)",100,expectedR(ss,SENATE_MIDS),20,51);
- const [hd,hr]=party(h),[sd,sr]=party(s);
- $("control").innerHTML=duel("Controle Huis",hd,hr)+duel("Controle Senaat",sd,sr);
+/* ---------- markdown ---------- */
+function inline(raw){
+  let s=esc(raw);const codes=[];
+  s=s.replace(/`([^`\n]+)`/g,(_,c)=>{codes.push(c);return '\u0000'+(codes.length-1)+'\u0000'});
+  s=s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  s=s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+[^\s<).,;:!?])/g,'$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+  s=s.replace(/\*\*([^*\n]+)\*\*/g,'<strong>$1</strong>').replace(/__([^_\n]+)__/g,'<strong>$1</strong>');
+  s=s.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\*)/g,'$1<em>$2</em>').replace(/~~([^~\n]+)~~/g,'<del>$1</del>');
+  return s.replace(/\u0000(\d+)\u0000/g,(_,i)=>'<code>'+codes[+i]+'</code>');
+}
+const LIST_RE=/^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+function listHTML(items){
+  let h='';const st=[];
+  for(const it of items){
+    while(st.length&&st[st.length-1].lvl>it.lvl)h+='</li></'+st.pop().tag+'>';
+    if(!st.length||st[st.length-1].lvl<it.lvl){
+      const tag=it.ord?'ol':'ul';
+      h+=`<${tag}${it.ord&&it.num!==1?` start="${it.num}"`:''}><li>`;st.push({lvl:it.lvl,tag});
+    }else h+='</li><li>';
+    h+=inline(it.text);
+  }
+  while(st.length)h+='</li></'+st.pop().tag+'>';
+  return h;
+}
+function tableHTML(rows){
+  const cells=r=>r.trim().replace(/^\||\|$/g,'').split('|').map(x=>x.trim());
+  const al=cells(rows[1]).map(x=>x.startsWith(':')&&x.endsWith(':')?'center':x.endsWith(':')?'right':'');
+  const st=i=>al[i]?` style="text-align:${al[i]}"`:'';
+  return '<div class="tw"><table><thead><tr>'+cells(rows[0]).map((c,i)=>`<th${st(i)}>${inline(c)}</th>`).join('')+'</tr></thead><tbody>'+
+    rows.slice(2).map(r=>'<tr>'+cells(r).map((c,i)=>`<td${st(i)}>${inline(c)}</td>`).join('')+'</tr>').join('')+'</tbody></table></div>';
+}
+const codeHTML=b=>`<div class="code"><div class="ch"><span>${esc(b.l||'code')}</span><button data-a="cc">${ic.copy}<span>Kopiëren</span></button></div><pre><code>${esc(b.c)}</code></pre></div>`;
+function md(src){
+  const blocks=[];
+  src=src.replace(/```([^\n`]*)\n([\s\S]*?)(?:\n?```|$)/g,(_,l,c)=>{blocks.push({l:l.trim().split(/\s+/)[0],c});return '\n\u0001'+(blocks.length-1)+'\u0001\n'});
+  const L=src.split('\n'),out=[];let i=0,m;
+  const blockStart=l=>/^\u0001\d+\u0001$/.test(l)||/^#{1,6}\s/.test(l)||/^\s*>/.test(l)||LIST_RE.test(l)||/^\s*([-*_])(\s*\1){2,}\s*$/.test(l);
+  while(i<L.length){
+    const l=L[i];
+    if(!l.trim()){i++;continue}
+    if(m=l.match(/^\u0001(\d+)\u0001$/)){out.push(codeHTML(blocks[+m[1]]));i++;continue}
+    if(m=l.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/)){out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`);i++;continue}
+    if(/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)){out.push('<hr>');i++;continue}
+    if(/^\s*>/.test(l)){const q=[];while(i<L.length&&/^\s*>/.test(L[i]))q.push(L[i++].replace(/^\s*>\s?/,''));out.push('<blockquote>'+q.map(x=>inline(x)).join('<br>')+'</blockquote>');continue}
+    if(LIST_RE.test(l)){
+      const items=[];
+      while(i<L.length){
+        const mm=L[i].match(LIST_RE);
+        if(mm){items.push({lvl:Math.floor(mm[1].replace(/\t/g,'  ').length/2),ord:/\d/.test(mm[2]),num:parseInt(mm[2])||1,text:mm[3]});i++}
+        else if(!L[i].trim()&&i+1<L.length&&LIST_RE.test(L[i+1]))i++;
+        else if(/^\s{2,}\S/.test(L[i])&&items.length&&!/^\s*\u0001/.test(L[i])){items[items.length-1].text+=' '+L[i].trim();i++}
+        else break;
+      }
+      out.push(listHTML(items));continue;
+    }
+    if(l.includes('|')&&i+1<L.length&&L[i+1].includes('-')&&/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(L[i+1])){
+      const rows=[L[i],L[i+1]];i+=2;
+      while(i<L.length&&L[i].trim()&&L[i].includes('|'))rows.push(L[i++]);
+      out.push(tableHTML(rows));continue;
+    }
+    const p=[L[i++]];
+    while(i<L.length&&L[i].trim()&&!blockStart(L[i]))p.push(L[i++]);
+    out.push('<p>'+p.map(x=>inline(x)).join('<br>')+'</p>');
+  }
+  return out.join('');
 }
 
-const parseDate=s=>{const d=new Date(/[zZ+]|GMT/.test(s)?s:String(s).replace(" ","T")+"Z");return isNaN(d)?0:d.getTime()};
-const ago=t=>{if(!t)return"";const m=Math.round((Date.now()-t)/60000);return m<1?"zojuist":m<60?m+" min geleden":m<1440?Math.round(m/60)+" uur geleden":Math.round(m/1440)+" dagen geleden"};
-async function feed(url){const r=await fetch(R2J+encodeURIComponent(url));if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();if(j.status!=="ok")throw new Error(j.message||"feed-fout");return j.items||[]}
-const strip=h=>{const d=document.createElement("div");d.innerHTML=h||"";return d.textContent.trim()};
-const tidy=t=>t.replace(/(TRUMP)(\S+\.\w+\/)/g,"$1\n$2").replace(/\s*[–—]\s+(?=[A-Z])/g,"\n• ").replace(/^•\s*/,"").replace(/(GET OUT AND VOTE FOR:)\s*/,"$1\n").trim();
-function toggle(btn){const t=btn.previousElementSibling;const c=t.classList.toggle("clamp");btn.textContent=c?"Meer":"Minder"}
-window.toggle=toggle;
-async function refreshTruth(){
- try{const items=(await feed("https://www.trumpstruth.org/feed")).slice(0,5);
-  $("truth").innerHTML=items.map(i=>{const t=tidy(strip(i.title||i.description)),long=t.length>220||t.split("\n").length>4;
-   return `<div class="item"><div class="av" style="background:#c0392b">DT</div><div class="body"><div class="top"><b>Donald J. Trump</b><span>Truth Social · ${esc(ago(parseDate(i.pubDate)))}</span></div><div class="txt${long?" clamp":""}">${esc(t)}</div>${long?'<button class="more" onclick="toggle(this)">Meer</button>':""}<div class="meta"><a href="${esc(safe(i.link))}" target="_blank" rel="noopener" style="color:inherit">Origineel bekijken ↗</a></div></div></div>`}).join("")||"Geen posts gevonden.";
- }catch(e){$("truth").innerHTML='<span class="err">Truth Social niet beschikbaar ('+esc(e.message)+')</span>'}
+/* ---------- <think>-blokken (Qwen3 e.d.) ---------- */
+function split(m){
+  let c=m.content||'',r=m.reasoning||'',open=false;
+  const t=c.match(/^\s*<think>([\s\S]*?)(<\/think>|$)/);
+  if(t){r=(r?r+'\n':'')+t[1];open=!t[2];c=c.slice(t[0].length)}
+  else if(c.includes('</think>')){const i=c.indexOf('</think>');r=(r?r+'\n':'')+c.slice(0,i);c=c.slice(i+8)}
+  c=c.replace(/^\s+/,'');
+  return {answer:c,think:r.trim(),thinking:open||(!!r&&!c&&!!m._live)};
 }
-const SOURCES=[["NBC News","https://feeds.nbcnews.com/nbcnews/public/politics"],["CBS News","https://www.cbsnews.com/latest/rss/politics"],["Fox News","https://moxie.foxnews.com/google-publisher/politics.xml"],["ABC News","https://feeds.abcnews.com/abcnews/politicsheadlines"],["CNN","http://rss.cnn.com/rss/cnn_allpolitics.rss"]];
-const COL={"NBC News":"#6d28d9","CBS News":"#0369a1","Fox News":"#b91c1c","ABC News":"#1d4ed8","CNN":"#be123c"};
-async function refreshNews(){
- const res=await Promise.allSettled(SOURCES.map(async([n,u])=>(await feed(u)).slice(0,6).map(i=>({n,t:strip(i.title),l:i.link,ts:parseDate(i.pubDate)}))));
- const all=res.flatMap(r=>r.status==="fulfilled"?r.value:[]).sort((a,b)=>b.ts-a.ts).slice(0,12);
- const bad=res.filter(r=>r.status==="rejected").length;
- $("news").innerHTML=(all.map(i=>`<div class="item"><div class="av" style="background:${COL[i.n]||"#64748b"}">${esc(i.n.slice(0,3).toUpperCase())}</div><div class="body"><div class="top"><b>${esc(i.n)}</b><span>${esc(ago(i.ts))}</span></div><a class="head" href="${esc(safe(i.l))}" target="_blank" rel="noopener">${esc(i.t)}</a></div></div>`).join("")||'<span class="err">Nieuws niet beschikbaar</span>')+(bad&&all.length?`<div class="meta">${bad} van ${SOURCES.length} bronnen niet bereikbaar.</div>`:"");
+
+/* ---------- rendering ---------- */
+const thread=$('#thread'),scroller=$('#scroll'),inp=$('#inp');
+function greeting(){const h=new Date().getHours();return h<6?'Goedenacht':h<12?'Goedemorgen':h<18?'Goedemiddag':'Goedenavond'}
+function aiBody(m){
+  const p=split(m);let h='';
+  if(p.think&&S.showThinking){
+    const open=m._open!==undefined?m._open:p.thinking;
+    h+=`<details class="think"${open?' open':''}><summary>${p.thinking?'Denkt na…':'Redenering'}</summary><div>${esc(p.think)}</div></details>`;
+  }
+  if(p.answer)h+=md(p.answer);
+  else if(m._live&&!p.think)h+='<span class="dots"><i></i><i></i><i></i></span>';
+  if(m.finish==='length')h+='<div class="note">Antwoord afgekapt: maximum aantal tokens bereikt. Verhoog "Max tokens" in de instellingen.</div>';
+  if(m.error)h+=`<div class="error">${esc(m.error)}</div>`;
+  return h;
 }
-async function tick(){
- try{await refreshSeats();$("dot").className="dot";$("status").textContent="Live · bijgewerkt "+new Date().toLocaleTimeString("nl-NL")}
- catch(e){$("dot").className="dot bad";$("status").innerHTML='<span class="err">Feed niet beschikbaar ('+esc(e.message)+') — opnieuw proberen</span>'}
+function footHTML(m,i,c){
+  if(m._live)return '';
+  const last=i===c.messages.length-1;
+  let h=`<button class="ibtn" data-a="copy" title="Kopiëren">${ic.copy}</button>`;
+  if(last)h+=`<button class="ibtn" data-a="regen" title="Opnieuw genereren">${ic.refresh}</button>`;
+  if(m.stats){const s=m.stats;h+=`<span class="stats">${[s.tokens?s.tokens+' tokens':'',s.tps?s.tps.toFixed(1)+' tok/s':'',s.secs?s.secs.toFixed(1)+'s':'',m.model||''].filter(Boolean).join(' · ')}</span>`}
+  return h;
 }
-tick();setInterval(tick,30000);
-refreshTruth();refreshNews();setInterval(()=>{refreshTruth();refreshNews()},300000);
+function msgHTML(m,i,c){
+  if(m.role==='user')return `<div class="msg user" data-i="${i}"><div class="bubble">${esc(m.content)}</div><div class="acts"><button class="ibtn" data-a="edit" title="Bewerken">${ic.pencil}</button><button class="ibtn" data-a="copy" title="Kopiëren">${ic.copy}</button></div></div>`;
+  return `<div class="msg ai" data-i="${i}"><div class="body">${aiBody(m)}</div><div class="acts foot keep">${footHTML(m,i,c)}</div></div>`;
+}
+function renderThread(){
+  const c=cur(),has=!!(c&&c.messages.length);
+  $('#hero').hidden=has;
+  thread.innerHTML=has?c.messages.map((m,i)=>msgHTML(m,i,c)).join(''):'';
+  window.dispatchEvent(new Event('resize')); // orb zoekt zijn plek opnieuw
+}
+function renderSide(){
+  const l=chats.slice().sort((a,b)=>b.updated-a.updated);
+  $('#list').innerHTML=l.length?'<h4>Gesprekken</h4>'+l.map(c=>`<div class="item${c.id===curId?' on':''}" data-id="${c.id}"><span class="t">${esc(c.title)}</span><span class="acts"><button data-a="ren" title="Hernoemen">${ic.pencil}</button><button data-a="del" title="Verwijderen">${ic.trash}</button></span></div>`).join(''):'<p class="empty-s">Nog geen gesprekken</p>';
+  syncMenuTabs();
+}
+function renderChrome(){
+  $('#dClose').innerHTML=ic.x;
+  $('#send').innerHTML=busy?ic.stop:ic.up;$('#send').title=busy?'Stoppen':'Verzenden';
+  $('#mdl').textContent=S.model||'Geen model gekozen';
+  $('#stSide').innerHTML=`<i class="dot ${conn==='ok'?'ok':conn==='bad'?'bad':''}"></i><span>${conn==='ok'?'Verbonden · '+esc(S.baseUrl.replace(/^https?:\/\//,'')):conn==='bad'?'Geen verbinding':'Verbinding controleren…'}</span>`;
+}
+const nearBottom=()=>scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<140;
+const toBottom=()=>{scroller.scrollTop=scroller.scrollHeight};
+
+/* ---------- thema ---------- */
+const mq=matchMedia('(prefers-color-scheme: dark)');
+function applyTheme(){
+  const d=S.theme==='auto'?(mq.matches?'dark':'light'):S.theme;
+  document.documentElement.dataset.theme=d;document.body.classList.toggle('is-dark',d==='dark');
+  try{S.theme==='auto'?localStorage.removeItem('rv-theme'):localStorage.setItem('rv-theme',S.theme)}catch{}
+}
+mq.addEventListener?.('change',applyTheme);
+
+/* ---------- verbinding ---------- */
+const base=()=>S.baseUrl.trim().replace(/\/+$/,'');
+const headers=()=>{const h={'Content-Type':'application/json'};if(S.apiKey.trim())h.Authorization='Bearer '+S.apiKey.trim();return h};
+function explain(e){
+  const msg=String(e&&e.message||e);
+  if(e instanceof TypeError||/failed to fetch|networkerror|load failed/i.test(msg)){
+    let t=`Kan geen verbinding maken met ${base()}.\n\n• Draait de LM Studio-server? (tabblad Developer → Status: Running)\n• Staat "Enable CORS" aan in de server-instellingen? (nodig als je dit bestand vanuit file:// of een andere host opent)\n• Bij gebruik vanaf een andere computer: zet "Serve on Local Network" aan en gebruik het IP-adres in de Base URL.`;
+    if(location.protocol==='https:'&&/^http:\/\//.test(base())&&!/localhost|127\.0\.0\.1/.test(base()))t+='\n• Deze pagina draait op https, maar de server op http: de browser blokkeert dat. Open chat.html lokaal.';
+    return t;
+  }
+  return msg;
+}
+async function loadModels(verbose){
+  const st=$('#cstat');
+  if(verbose&&st){st.className='cstat';st.textContent='Verbinding testen…'}
+  try{
+    const r=await fetch(base()+'/models',{headers:headers()});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const j=await r.json();
+    models=(j.data||[]).map(x=>x.id).filter(Boolean);
+    conn='ok';
+    if(!S.model&&models.length){S.model=models.find(x=>!/embed/i.test(x))||models[0];saveS()}
+    if(st){st.className='cstat ok';st.textContent=`Verbonden · ${models.length} model(len) gevonden`}
+  }catch(e){
+    conn='bad';models=[];
+    if(st){st.className='cstat bad';st.textContent=explain(e).split('\n')[0]}
+  }
+  renderChrome();renderModelChips();
+}
+
+/* ---------- genereren ---------- */
+const PARAMS=['temperature','top_p','top_k','min_p','max_tokens','frequency_penalty','presence_penalty','repeat_penalty','seed'];
+function buildBody(c){
+  let hist=c.messages.slice(0,-1).map(x=>({role:x.role,content:x.role==='assistant'?split(x).answer:x.content}));
+  hist=hist.filter(x=>!(x.role==='assistant'&&!x.content));
+  const lim=parseInt(S.historyLimit);if(lim>0)hist=hist.slice(-lim);
+  if(S.noThink&&hist.length&&hist[hist.length-1].role==='user')hist[hist.length-1]={role:'user',content:hist[hist.length-1].content+' /no_think'};
+  const msgs=(S.system.trim()?[{role:'system',content:S.system.trim()}]:[]).concat(hist);
+  const body={messages:msgs,stream:!!S.stream};
+  if(S.model)body.model=S.model;
+  if(S.stream)body.stream_options={include_usage:true};
+  for(const k of PARAMS){const v=String(S[k]).trim();if(v!==''&&!isNaN(+v))body[k]=+v}
+  const stop=S.stop.split('\n').map(x=>x.replace(/\\n/g,'\n')).filter(x=>x!=='');if(stop.length)body.stop=stop;
+  if(S.extraBody.trim()){try{Object.assign(body,JSON.parse(S.extraBody))}catch{}}
+  return body;
+}
+function setBusy(b){busy=b;$('#send').innerHTML=b?ic.stop:ic.up;$('#send').title=b?'Stoppen':'Verzenden';updSend()}
+function updSend(){$('#send').disabled=!busy&&!inp.value.trim()}
+
+async function generate(){
+  const c=cur();
+  const m={role:'assistant',content:'',reasoning:'',model:S.model,_live:true};
+  c.messages.push(m);c.updated=Date.now();saveC();renderThread();renderSide();toBottom();
+  setBusy(true);
+  const el=thread.lastElementChild,bodyEl=el.querySelector('.body');
+  let raf=0;
+  const paint=()=>{raf=0;const stick=nearBottom();bodyEl.innerHTML=aiBody(m);if(stick)toBottom()};
+  const sched=()=>{if(!raf)raf=requestAnimationFrame(paint)};
+  ctrl=new AbortController();
+  const t0=performance.now();let t1=0,chunks=0,usage=null;
+  try{
+    const res=await fetch(base()+'/chat/completions',{method:'POST',headers:headers(),body:JSON.stringify(buildBody(c)),signal:ctrl.signal});
+    if(!res.ok){
+      let t=await res.text();try{const j=JSON.parse(t);t=j.error?.message||j.error||t}catch{}
+      throw new Error(`HTTP ${res.status}: ${typeof t==='string'?t:JSON.stringify(t)}`);
+    }
+    conn='ok';
+    if(S.stream&&res.body){
+      const rd=res.body.getReader(),dec=new TextDecoder();let buf='';
+      for(;;){
+        const {done,value}=await rd.read();if(done)break;
+        buf+=dec.decode(value,{stream:true});
+        let nl;
+        while((nl=buf.indexOf('\n'))>=0){
+          const line=buf.slice(0,nl).trim();buf=buf.slice(nl+1);
+          if(!line.startsWith('data:'))continue;
+          const d=line.slice(5).trim();if(!d||d==='[DONE]')continue;
+          let j;try{j=JSON.parse(d)}catch{continue}
+          if(j.error)throw new Error(j.error.message||JSON.stringify(j.error));
+          const ch=j.choices&&j.choices[0];
+          if(ch){
+            const dl=ch.delta||{};
+            const rc=dl.reasoning_content||dl.reasoning||'';
+            if(dl.content||rc){if(!t1)t1=performance.now();chunks++;m.content+=dl.content||'';m.reasoning+=rc;sched()}
+            if(ch.finish_reason)m.finish=ch.finish_reason;
+          }
+          if(j.usage)usage=j.usage;
+        }
+      }
+    }else{
+      const j=await res.json();
+      const msg=j.choices?.[0]?.message||{};
+      m.content=msg.content||'';m.reasoning=msg.reasoning_content||msg.reasoning||'';
+      m.finish=j.choices?.[0]?.finish_reason;usage=j.usage||null;t1=t0;
+    }
+  }catch(e){
+    if(e.name!=='AbortError')m.error=explain(e),conn=e instanceof TypeError?'bad':conn;
+  }finally{
+    if(raf)cancelAnimationFrame(raf);
+    const t2=performance.now();
+    delete m._live;
+    const tokens=usage?.completion_tokens||chunks;
+    if(tokens){m.stats={tokens,secs:(t2-t0)/1000,tps:t1&&t2>t1?tokens/((t2-t1)/1000):0}}
+    if(!m.content&&!m.reasoning&&!m.error){c.messages.pop()}
+    ctrl=null;c.updated=Date.now();saveC();
+    setBusy(false);renderThread();renderSide();renderChrome();
+    if(nearBottom()||true)toBottom();
+  }
+}
+async function send(text){
+  text=text.trim();if(!text||busy)return;
+  let c=cur();
+  if(!c){c={id:uid(),title:'Nieuw gesprek',created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);curId=c.id}
+  if(!c.messages.length)c.title=text.replace(/\s+/g,' ').slice(0,48)||'Nieuw gesprek';
+  c.messages.push({role:'user',content:text});
+  inp.value='';autosize();
+  await generate();
+}
+function regenerate(){
+  if(busy)return;const c=cur();if(!c)return;
+  while(c.messages.length&&c.messages[c.messages.length-1].role==='assistant')c.messages.pop();
+  if(c.messages.length)generate();
+}
+
+/* ---------- composer ---------- */
+function autosize(){inp.style.height='auto';inp.style.height=Math.min(inp.scrollHeight,220)+'px';updSend()}
+inp.addEventListener('input',autosize);
+inp.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.isComposing){
+    const go=S.enterToSend?!e.shiftKey:(e.ctrlKey||e.metaKey);
+    if(go){e.preventDefault();send(inp.value)}
+  }
+});
+$('#send').addEventListener('click',()=>{if(busy)ctrl&&ctrl.abort();else send(inp.value)});
+
+/* ---------- thread acties ---------- */
+async function copyText(t){
+  try{await navigator.clipboard.writeText(t)}catch{
+    const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy')}catch{}a.remove();
+  }
+}
+thread.addEventListener('click',async e=>{
+  const sg=e.target.closest('.sugg button');
+  if(sg){inp.value=sg.textContent+': ';autosize();inp.focus();return}
+  const sm=e.target.closest('summary');
+  if(sm){const d=sm.parentElement,i=+sm.closest('.msg').dataset.i;cur().messages[i]._open=!d.open;return}
+  const b=e.target.closest('[data-a]');if(!b)return;
+  const a=b.dataset.a;
+  if(a==='cc'){
+    await copyText(b.closest('.code').querySelector('code').textContent);
+    const s=b.querySelector('span');s.textContent='Gekopieerd';setTimeout(()=>s.textContent='Kopiëren',1400);return;
+  }
+  const msgEl=b.closest('.msg'),i=msgEl?+msgEl.dataset.i:-1,c=cur();
+  if(a==='copy'){const m=c.messages[i];await copyText(m.role==='assistant'?split(m).answer:m.content);b.innerHTML=ic.check;setTimeout(()=>b.innerHTML=ic.copy,1200)}
+  else if(a==='regen')regenerate();
+  else if(a==='edit'&&!busy){
+    msgEl.innerHTML=`<div class="editbox"><textarea>${esc(c.messages[i].content)}</textarea><div class="row"><button class="btn" data-a="ecancel">Annuleren</button><button class="btn pri" data-a="esave">Opslaan en verzenden</button></div></div>`;
+    msgEl.style.alignItems='stretch';const t=msgEl.querySelector('textarea');t.focus();t.setSelectionRange(t.value.length,t.value.length);
+  }
+  else if(a==='ecancel')renderThread();
+  else if(a==='esave'&&!busy){
+    const v=msgEl.querySelector('textarea').value.trim();if(!v)return;
+    c.messages.length=i;c.messages.push({role:'user',content:v});generate();
+  }
+});
+
+/* ---------- pil-menu ---------- */
+const scrim=$('#scrim'),menuBtn=$('#menu-btn');
+const drawerOpen=()=>$('#drawer').classList.contains('on');
+function syncMenuTabs(){const o=document.body.classList.contains('menu-open');document.querySelectorAll('#pill-menu a,#pill-menu button').forEach(el=>el.tabIndex=o?0:-1)}
+function setMenu(open){
+  document.body.classList.toggle('menu-open',open);
+  menuBtn.setAttribute('aria-expanded',open);menuBtn.setAttribute('aria-label',open?'Menu sluiten':'Menu openen');
+  $('#menu-text').textContent=open?'Sluit':'Menu';
+  scrim.classList.toggle('on',open||drawerOpen());syncMenuTabs();
+}
+const closeSide=()=>setMenu(false);
+function newChat(){
+  if(busy)return;
+  const c=cur();
+  if(c&&!c.messages.length){closeSide();inp.focus();return}
+  curId=null;saveC();renderThread();renderSide();closeSide();inp.focus();
+}
+$('#newChat').addEventListener('click',newChat);
+menuBtn.addEventListener('click',()=>setMenu(!document.body.classList.contains('menu-open')));
+$('#list').addEventListener('click',e=>{
+  const it=e.target.closest('.item');if(!it)return;
+  const id=it.dataset.id,a=e.target.closest('[data-a]')?.dataset.a;
+  if(a==='del'){
+    if(!confirm('Dit gesprek verwijderen?'))return;
+    if(busy&&id===curId)ctrl&&ctrl.abort();
+    chats=chats.filter(c=>c.id!==id);if(curId===id)curId=null;saveC();renderThread();renderSide();return;
+  }
+  if(a==='ren'){
+    const c=chats.find(x=>x.id===id),t=prompt('Nieuwe naam:',c.title);
+    if(t&&t.trim()){c.title=t.trim();saveC();renderSide()}return;
+  }
+  if(busy)return;
+  curId=id;saveC();renderThread();renderSide();closeSide();toBottom();
+});
+
+/* ---------- exporteren / importeren ---------- */
+function download(name,text,type){
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+}
+$('#dl').addEventListener('click',()=>{
+  const c=cur();if(!c||!c.messages.length)return;
+  const t=`# ${c.title}\n\n`+c.messages.map(m=>`**${m.role==='user'?'Jij':'AI'}:**\n\n${m.role==='assistant'?split(m).answer:m.content}`).join('\n\n---\n\n');
+  download((c.title.replace(/[^\w\- ]+/g,'').trim()||'gesprek')+'.md',t,'text/markdown');
+});
+$('#file').addEventListener('change',async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{
+    const j=JSON.parse(await f.text());
+    const incoming=Array.isArray(j)?j:j.chats;
+    if(!Array.isArray(incoming))throw new Error();
+    const ids=new Set(chats.map(c=>c.id));let n=0;
+    for(const c of incoming){if(c&&c.id&&Array.isArray(c.messages)&&!ids.has(c.id)){chats.push({title:'Gesprek',created:Date.now(),updated:Date.now(),...c});n++}}
+    saveC();renderSide();alert(n+' gesprek(ken) geïmporteerd.');
+  }catch{alert('Ongeldig bestand.')}
+});
+
+/* ---------- instellingen ---------- */
+const NUM=[
+  ['temperature','Temperature','Hoger = creatiever, lager = voorspelbaarder. Typisch 0.6–0.8.',.05],
+  ['top_p','Top P','Nucleus sampling. Leeg = niet meesturen (bijv. 0.8–0.95).',.05],
+  ['top_k','Top K','Beperk tot de K meest waarschijnlijke tokens (bijv. 20–40).',1],
+  ['min_p','Min P','Minimale kans t.o.v. het beste token (bijv. 0.05).',.01],
+  ['max_tokens','Max tokens','Maximale lengte van het antwoord. Leeg of -1 = onbeperkt.',1],
+  ['repeat_penalty','Repeat penalty','Straf voor herhaling (LM Studio/llama.cpp), bijv. 1.1.',.01],
+  ['frequency_penalty','Frequency penalty','OpenAI-stijl, -2 t/m 2.',.1],
+  ['presence_penalty','Presence penalty','OpenAI-stijl, -2 t/m 2.',.1],
+  ['seed','Seed','Vaste seed voor reproduceerbare antwoorden.',1],
+];
+const num=(k,l,h,step)=>`<div class="fld"><label for="f_${k}">${l}</label><input type="number" id="f_${k}" data-k="${k}" step="${step}" placeholder="standaard" value="${esc(S[k])}"><div class="h">${h}</div></div>`;
+const chk=(k,t,d)=>`<label class="chk"><input type="checkbox" data-k="${k}"${S[k]?' checked':''}><span><b>${t}</b><small>${d}</small></span></label>`;
+const SHARED_KEYS=['baseUrl','model','system','temperature','top_p','top_k','min_p','max_tokens','frequency_penalty','presence_penalty','repeat_penalty','seed','stop','stream','historyLimit','noThink','extraBody'];
+let shared={available:false,configured:false},isAdmin=false,adminPw='';
+try{adminPw=sessionStorage.getItem('lai.pw')||''}catch{}
+const stash=v=>{try{v?sessionStorage.setItem('lai.pw',v):sessionStorage.removeItem('lai.pw')}catch{}};
+async function api(body){
+  try{
+    const r=await fetch('chat-config.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    return await r.json();
+  }catch{return {ok:false,error:'Geen antwoord van de server (chat-config.php).'}}
+}
+async function loadShared(){
+  try{
+    const r=await fetch('chat-config.php',{cache:'no-store'});
+    const j=await r.json();
+    if(!j||j.ok!==true)throw 0;
+    shared={available:true,configured:!!j.configured};
+    if(j.configured){for(const k of SHARED_KEYS)if(j.config&&k in j.config)S[k]=j.config[k]}
+    if(adminPw&&j.configured){const v=await api({action:'verify',password:adminPw});isAdmin=!!v.ok;if(!isAdmin){adminPw='';stash('')}}
+  }catch{shared={available:false,configured:false}}
+}
+const locked=()=>shared.configured&&!isAdmin;
+function adminHTML(){
+  const pw=(id,l,h)=>`<div class="fld"><label for="${id}">${l}</label><input type="password" id="${id}" autocomplete="${id==='pw_new'?'new-password':'current-password'}" placeholder="••••••••">${h?`<div class="h">${h}</div>`:''}</div>`;
+  let h='<h3>Delen met iedereen</h3>';
+  if(!shared.available)return h+'<p class="h" style="color:var(--mut);font-size:13px">Delen werkt alleen als deze pagina op een webserver met PHP staat, met <code>chat-config.php</code> in dezelfde map. Nu gebruik je alleen lokale instellingen.</p>';
+  if(!shared.configured)h+=pw('pw_in','Kies een beheerderswachtwoord','Minstens 8 tekens. Na opslaan gebruikt iedereen die deze pagina opent automatisch de verbinding en instellingen hierboven. Doe dit meteen na het uploaden: wie het eerst opslaat, bepaalt het wachtwoord.')+'<div class="rowb"><button class="btn pri" data-adm="save">Opslaan voor iedereen</button></div>';
+  else if(!isAdmin)h=h.replace('Delen met iedereen','Beheerder')+pw('pw_in','Wachtwoord','Ontgrendel om verbinding, model en parameters voor iedereen te wijzigen.')+'<div class="rowb"><button class="btn pri" data-adm="unlock">Ontgrendelen</button></div>';
+  else h+='<p class="h" style="color:var(--ok);font-size:13px;margin:0 0 12px">Je bent beheerder. Wijzigingen hierboven gelden pas voor iedereen na opslaan.</p>'+pw('pw_new','Nieuw wachtwoord (optioneel)','Laat leeg om het wachtwoord te behouden.')+'<div class="rowb"><button class="btn pri" data-adm="save">Opslaan voor iedereen</button><button class="btn" data-adm="logout">Uitloggen</button><button class="btn danger" data-adm="clear">Delen stoppen</button></div>';
+  return h+'<div class="cstat" id="admStat" style="margin-top:10px"></div>';
+}
+function renderDrawer(){
+  const conn_=`
+  <h3>Verbinding</h3>
+  <div class="fld"><label for="f_baseUrl">Base URL</label><input type="text" id="f_baseUrl" data-k="baseUrl" value="${esc(S.baseUrl)}" spellcheck="false"><div class="h">LM Studio standaard: <code>http://localhost:1234/v1</code>. Andere pc op je netwerk: <code>http://192.168.x.x:1234/v1</code>. Voor bezoekers van buiten je netwerk moet dit een publiek bereikbaar (https) adres zijn.</div></div>
+  <div class="fld"><label for="f_apiKey">API-sleutel</label><input type="password" id="f_apiKey" data-k="apiKey" value="${esc(S.apiKey)}" autocomplete="off" placeholder="optioneel"><div class="h">LM Studio vraagt er normaal geen. Wordt als Bearer-token meegestuurd en nooit gedeeld.</div></div>
+  <div class="fld"><label for="f_model">Model</label><input type="text" id="f_model" data-k="model" value="${esc(S.model)}" spellcheck="false" placeholder="bijv. qwen3-8b"><div class="mods" id="mods"></div><div class="h">Leeg = het model dat in LM Studio geladen is.</div></div>
+  <div class="rowb"><button class="btn pri" id="test">Test verbinding</button><span class="cstat" id="cstat"></span></div>
+
+  <h3>Systeemprompt</h3>
+  <div class="fld"><textarea id="f_system" data-k="system" placeholder="Bijv. Je bent een behulpzame assistent die in het Nederlands antwoordt.">${esc(S.system)}</textarea></div>
+
+  <h3>Sampling</h3>
+  <div class="grid2">${NUM.map(n=>num(...n)).join('')}</div>
+  <div class="fld"><label for="f_stop">Stopsequenties</label><textarea id="f_stop" data-k="stop" class="code-t" placeholder="één per regel" style="min-height:64px">${esc(S.stop)}</textarea><div class="h">Generatie stopt zodra een van deze teksten verschijnt.</div></div>
+
+  <h3>Gedrag</h3>
+  ${chk('stream','Streamen','Toon het antwoord woord voor woord terwijl het binnenkomt.')}
+  ${chk('noThink','Denkmodus uitzetten (Qwen3)','Voegt <code>/no_think</code> toe aan het laatste bericht voor snellere antwoorden.')}
+  <div class="fld"><label for="f_historyLimit">Max. berichten meesturen</label><input type="number" id="f_historyLimit" data-k="historyLimit" min="1" step="1" placeholder="alles" value="${esc(S.historyLimit)}"><div class="h">Beperk de context tot de laatste N berichten. Leeg = het hele gesprek.</div></div>
+
+  <h3>Geavanceerd</h3>
+  <div class="fld"><label for="f_extraBody">Extra JSON in het verzoek</label><textarea id="f_extraBody" data-k="extraBody" class="code-t" spellcheck="false" placeholder='{"chat_template_kwargs": {"enable_thinking": false}}'>${esc(S.extraBody)}</textarea><div class="h">Wordt samengevoegd met de request-body van <code>/chat/completions</code> en overschrijft bovenstaande waarden.</div></div>`;
+  const lockedInfo=`
+  <h3>Verbinding</h3>
+  <p class="h" style="font-size:13.5px;color:var(--ink2);margin:0">Deze chatbot is ingesteld door de beheerder${S.model?` (model: <b>${esc(S.model)}</b>)`:''}. Je hoeft niets in te stellen.</p>
+  <div class="rowb" style="margin-top:10px"><button class="btn" id="test">Test verbinding</button><span class="cstat" id="cstat"></span></div>`;
+  $('#dBody').innerHTML=(locked()?lockedInfo:conn_)+`
+
+  <h3>Weergave</h3>
+  ${chk('showThinking','Redenering tonen','Toon &lt;think&gt;-blokken (Qwen3 e.d.) in een uitklapbaar blok.')}
+  ${chk('enterToSend','Enter verzendt','Aan: Enter verzendt, Shift+Enter nieuwe regel. Uit: Ctrl/Cmd+Enter verzendt.')}
+  <div class="fld"><label for="f_theme">Thema</label><select id="f_theme" data-k="theme"><option value="auto">Automatisch</option><option value="light">Licht</option><option value="dark">Donker</option></select></div>
+
+  <h3>Gegevens</h3>
+  <div class="rowb">
+    <button class="btn" id="exp">Alles exporteren</button><button class="btn" id="imp">Importeren</button>
+    <button class="btn danger" id="wipe">Alle gesprekken wissen</button>${locked()?'':'<button class="btn danger" id="reset">Standaardwaarden</button>'}
+  </div>
+  <p class="h" style="margin-top:12px;color:var(--mut);font-size:12.5px">Je gesprekken worden alleen in de localStorage van deze browser bewaard.</p>
+  `+adminHTML();
+  $('#f_theme').value=S.theme;
+  renderModelChips();
+}
+async function adminAction(kind){
+  const stat=$('#admStat'),say=(t,c)=>{if(stat){stat.className='cstat '+(c||'');stat.textContent=t}};
+  const val=id=>($('#'+id)?.value||'');
+  if(kind==='logout'){isAdmin=false;adminPw='';stash('');renderDrawer();return}
+  if(kind==='unlock'){
+    const pw=val('pw_in');if(!pw)return;
+    const r=await api({action:'verify',password:pw});
+    if(r.ok){isAdmin=true;adminPw=pw;stash(pw);renderDrawer();validateExtra()}else say(r.error||'Onjuist wachtwoord.','bad');
+    return;
+  }
+  if(kind==='clear'){
+    if(!confirm('Delen stoppen? Bezoekers moeten daarna zelf instellen.'))return;
+    const r=await api({action:'clear',password:adminPw});
+    if(r.ok){shared.configured=false;isAdmin=false;adminPw='';stash('');renderDrawer();validateExtra()}else say(r.error||'Mislukt.','bad');
+    return;
+  }
+  if(kind==='save'){
+    const first=!shared.configured,pw=first?val('pw_in'):adminPw,np=first?'':val('pw_new');
+    if(S.extraBody.trim()){try{const v=JSON.parse(S.extraBody);if(!v||typeof v!=='object'||Array.isArray(v))throw 0}catch{say('Extra JSON is ongeldig.','bad');return}}
+    const config={};for(const k of SHARED_KEYS)config[k]=S[k];
+    say('Opslaan…');
+    const r=await api({action:'save',password:pw,newPassword:np||undefined,config});
+    if(r.ok){shared.configured=true;isAdmin=true;adminPw=np||pw;stash(adminPw);renderDrawer();validateExtra();const s=$('#admStat');if(s){s.className='cstat ok';s.textContent='Opgeslagen: dit geldt nu voor iedereen.'}}
+    else say(r.error||'Opslaan mislukt.','bad');
+  }
+}
+function renderModelChips(){
+  const el=$('#mods');if(!el)return;
+  el.innerHTML=models.map(m=>`<button data-m="${esc(m)}" class="${m===S.model?'on':''}">${esc(m)}</button>`).join('');
+}
+function validateExtra(){
+  const t=$('#f_extraBody');if(!t)return;
+  let ok=true;if(S.extraBody.trim()){try{const v=JSON.parse(S.extraBody);ok=v&&typeof v==='object'&&!Array.isArray(v)}catch{ok=false}}
+  t.classList.toggle('bad',!ok);
+}
+let connTimer=0;
+$('#dBody').addEventListener('input',e=>{
+  const k=e.target.dataset.k;if(!k)return;
+  S[k]=e.target.type==='checkbox'?e.target.checked:e.target.value;
+  saveS();
+  if(k==='theme')applyTheme();
+  if(k==='extraBody')validateExtra();
+  if(k==='model'){renderChrome();renderModelChips()}
+  if(k==='baseUrl'||k==='apiKey'){conn='unknown';renderChrome();clearTimeout(connTimer);connTimer=setTimeout(()=>loadModels(true),700)}
+});
+$('#dBody').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.m){S.model=b.dataset.m;saveS();$('#f_model').value=S.model;renderChrome();renderModelChips()}
+  else if(b.dataset.adm)adminAction(b.dataset.adm);
+  else if(b.id==='test')loadModels(true);
+  else if(b.id==='exp')download('lokale-ai-gesprekken.json',JSON.stringify({version:1,exported:new Date().toISOString(),chats},null,1),'application/json');
+  else if(b.id==='imp')$('#file').click();
+  else if(b.id==='wipe'){if(confirm('ALLE gesprekken definitief wissen?')){if(busy&&ctrl)ctrl.abort();chats=[];curId=null;saveC();renderThread();renderSide()}}
+  else if(b.id==='reset'){if(confirm('Alle instellingen terugzetten naar standaard?')){S={...DEFAULTS};saveS();applyTheme();renderDrawer();renderChrome();loadModels(true)}}
+});
+function openDrawer(){renderDrawer();validateExtra();$('#drawer').classList.add('on');document.body.classList.add('drawer-open');scrim.classList.add('on');if(conn!=='ok')loadModels(false)}
+function closeDrawer(){if(!drawerOpen())return;$('#drawer').classList.remove('on');document.body.classList.remove('drawer-open');scrim.classList.toggle('on',document.body.classList.contains('menu-open'));clearTimeout(connTimer);if(conn!=='ok')loadModels(false)}
+['#menuSet','#mdl'].forEach(s=>$(s).addEventListener('click',()=>{closeSide();openDrawer()}));
+$('#dClose').addEventListener('click',closeDrawer);
+scrim.addEventListener('click',()=>{closeDrawer();closeSide()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();if(document.body.classList.contains('menu-open')){closeSide();menuBtn.focus()}}});
+$('#hero').addEventListener('click',e=>{const sg=e.target.closest('.sugg button');if(sg){inp.value=sg.textContent+': ';autosize();inp.focus()}});
+$('#theme').addEventListener('click',()=>{S.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';saveS();applyTheme()});
+
+/* ---------- start ---------- */
+if(!chats.some(c=>c.id===curId))curId=null;
+applyTheme();renderChrome();renderSide();renderThread();updSend();syncMenuTabs();
+loadShared().then(()=>{renderChrome();loadModels(false)});
+</script>
+<script>
+/* Rivsenn A.I. · atoom-botje (zie HANDOFF.md §7)
+   Groot in de hero; vliegt bij scrollen in een boogje naar het logo linksboven en neemt daar de plek van het logo-icoon in.
+   Nodig in de HTML:
+     <div class="orb-spot" id="orb-spot"></div>   in de hero (bepaalt start-positie en -grootte)
+     <canvas class="orb" id="orb" aria-hidden="true"></canvas>   (wordt naar <body> verplaatst, position: fixed)
+     .pill-bar .logo met daarin het logo-<svg> (eindpositie; het svg wordt verborgen via .logo.has-orb)
+   Thema: leest body.is-dark / html[data-theme] / prefers-color-scheme, dus laad dit NA rivsenn-core.js. */
+(function () {
+  'use strict';
+
+  /* ---------- Instellingen (alles wat je wilt bijstellen staat hier) ---------- */
+  var CFG = {
+    color: '#DCD1BF',              // kleur van banen, elektronen, R en gloed (beide thema's)
+    discLight: ['#2E2A25', '#1C1A17'], // alleen licht thema: donkere schijf achter het atoom (verloop binnen → buiten), zelfde tint als de logotegel
+    discShadow: 'rgba(60,45,25,0.25)',
+    atomSize: 0.26,                // straal van het atoom (D) als fractie van de canvasbreedte
+    flyDistance: 0.55,             // na (canvasgrootte × dit) px scrollen zit hij helemaal in het logo
+    flySmoothing: 6,               // hoe snel hij de scroll volgt (hoger = strakker)
+    dockScale: 1.12,               // grootte in het logo t.o.v. het logo-icoon
+    spin: 0.35,                    // draaisnelheid banen (rad/s)
+    glow: { light: [0.4, 0.28, 0.2], dark: [0.22, 0.14, 0.09] } // dekking van de 3 wiebelende gloedlagen
+  };
+
+  var cv = document.getElementById('orb'), spot = document.getElementById('orb-spot');
+  var logo = document.querySelector('.pill-bar .logo'), mark = logo && logo.querySelector('svg');
+  if (!cv || !cv.getContext || !spot || !mark) return;
+  var ctx = cv.getContext('2d');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var TAU = Math.PI * 2, S0 = 320, dpr = 1, dark = false;
+  // st.T tijd · spin hoek · kick klik-energie · pulse/pv veer · lx/ly leunen naar muis · p vliegvoortgang 0..1 · k huidige schaal
+  var st = { T: 0, spin: 0, kick: 0, pulse: 0, pv: 0, lx: 0, ly: 0, tlx: 0, tly: 0, p: -1, k: 1 };
+  var raf = 0, last = 0;
+  // R uit het logo (zelfde paden als het logo-svg, viewBox 0 0 64 64)
+  var R_LETTER = new Path2D('M21 50V19H37A8.5 8.5 0 0 1 37 36H21');   // stroke-width 10
+  var R_LEG = new Path2D('M30 36L41 36L52 50L41 50Z');
+  document.body.appendChild(cv);
+
+  function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
+  function rgba(h, a) { var n = parseInt(h.slice(1), 16); return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + clamp(a, 0, 1) + ')'; }
+  function readTheme() {
+    var html = document.documentElement;
+    dark = document.body.classList.contains('is-dark') || html.getAttribute('data-theme') === 'dark' ||
+      (!html.getAttribute('data-theme') && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    draw();
+  }
+
+  /* ---------- Tekenen (alles in canvas-px; S0 = canvasbreedte in CSS-px) ---------- */
+  function draw() {
+    var W = S0, T = st.T, k = st.k || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, W);
+    var D = W * CFG.atomSize * (1 + st.pulse) * (1 + Math.sin(T * 1.8) * 0.015); // ademen + klik-veer
+    var cx = W / 2 + st.lx, cy = W / 2 + st.ly;
+    var alphas = dark ? CFG.glow.dark : CFG.glow.light;
+
+    // 1. Wiebelende gloed: drie zachte lagen die als gelei golven (elk eigen snelheid/richting)
+    for (var L = 0; L < 3; L++) {
+      var gb = D * (1.05 + L * 0.18), ga = D * (0.1 + L * 0.06) * (1 + st.kick * 1.5);
+      var sp = [1.1, -0.8, 1.5][L], ph = L * 2.1;
+      ctx.beginPath();
+      for (var q = 0; q <= 120; q++) {
+        var th = q / 120 * TAU;
+        var rr = gb + ga * (0.55 * Math.sin(2 * th + T * sp + ph) + 0.3 * Math.sin(3 * th - T * sp * 1.4 + ph * 1.7) + 0.15 * Math.sin(5 * th + T * 2.3 + ph))
+                 + D * 0.04 * Math.sin(T * 1.6 + L);
+        var gx = cx + Math.cos(th) * rr, gy = cy + Math.sin(th) * rr;
+        if (q) ctx.lineTo(gx, gy); else ctx.moveTo(gx, gy);
+      }
+      ctx.closePath();
+      var gg = ctx.createRadialGradient(cx, cy, D * (dark ? 0.5 : 0.92), cx, cy, gb + ga);
+      gg.addColorStop(0, rgba(CFG.color, 0));
+      gg.addColorStop(0.55, rgba(CFG.color, alphas[L] * (0.8 + 0.2 * Math.sin(T * 2 + L)) + st.kick * 0.15));
+      gg.addColorStop(1, rgba(CFG.color, 0));
+      ctx.fillStyle = gg; ctx.fill();
+    }
+
+    // 2. Alleen licht thema: donkere schijf (zoals de logotegel) voor contrast, met zachte schaduw
+    if (!dark) {
+      var dr = D * 1.1 * (1 + Math.sin(T * 1.4) * 0.01);
+      ctx.shadowColor = CFG.discShadow; ctx.shadowBlur = D * 0.15 * dpr; ctx.shadowOffsetY = D * 0.05 * dpr;
+      var dg = ctx.createRadialGradient(cx - dr * 0.3, cy - dr * 0.35, dr * 0.1, cx, cy, dr);
+      dg.addColorStop(0, CFG.discLight[0]); dg.addColorStop(1, CFG.discLight[1]);
+      ctx.fillStyle = dg; ctx.beginPath(); ctx.arc(cx, cy, dr, 0, TAU); ctx.fill();
+      ctx.shadowColor = 'rgba(0,0,0,0)'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    }
+
+    // 3. R uit het logo, precies in het midden, achter de banen (letter is 36 eenheden hoog; midden ≈ 34,32)
+    var rs = D * (0.62 + 0.02 * Math.sin(T * 3)) / 36;
+    ctx.save();
+    ctx.translate(cx - 34 * rs, cy - 32 * rs); ctx.scale(rs, rs);
+    ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+    ctx.strokeStyle = CFG.color; ctx.fillStyle = CFG.color; ctx.lineWidth = 10;
+    ctx.stroke(R_LETTER); ctx.fill(R_LEG); ctx.fillRect(51, 5, 8, 8); // blokje rechtsboven, ook in CFG.color
+    ctx.restore();
+
+    // 4. Drie banen die draaien en kantelen (ellips met wisselende korte as = 3D-tol)
+    var lw = Math.max(1.1 / k, D * 0.04); // minstens ~1 schermpixel, ook klein in het logo
+    ctx.lineCap = 'round'; ctx.strokeStyle = CFG.color; ctx.lineWidth = lw;
+    var orbs = [];
+    for (var i = 0; i < 3; i++) {
+      var rot = st.spin + i * Math.PI / 3 + Math.sin(T * 0.7 + i * 2) * 0.12;
+      var a = D * 0.95, b = D * (0.3 + 0.12 * Math.sin(T * 0.9 + i * 2.1));
+      orbs.push([a, b, rot]);
+      ctx.beginPath(); ctx.ellipse(cx, cy, a, b, rot, 0, TAU); ctx.stroke();
+    }
+
+    // 5. Zachte gloed áchter alles (destination-over)
+    var g = ctx.createRadialGradient(cx, cy, dark ? 0 : D * 0.92, cx, cy, D * 1.5);
+    g.addColorStop(0, rgba(CFG.color, (dark ? 0.16 : 0.32) + st.kick * 0.12));
+    g.addColorStop(1, rgba(CFG.color, 0));
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, D * 1.5, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+
+    // 6. Elektronen: één per baan, elk met eigen snelheid; klik maakt ze sneller
+    ctx.fillStyle = CFG.color;
+    for (var j = 0; j < 3; j++) {
+      var o = orbs[j], t2 = T * (1.7 + j * 0.35) * (1 + st.kick) + j * 2;
+      var ex = Math.cos(t2) * o[0], ey = Math.sin(t2) * o[1], cr = Math.cos(o[2]), sr = Math.sin(o[2]);
+      ctx.beginPath(); ctx.arc(cx + ex * cr - ey * sr, cy + ex * sr + ey * cr, Math.max(1.1 / k, D * 0.055), 0, TAU); ctx.fill();
+    }
+  }
+
+  /* ---------- Vliegen tussen hero en logo ---------- */
+  function targetP() {
+    var sr = spot.getBoundingClientRect();
+    // Niet op home (spot verborgen) of menu open → altijd in het logo
+    if (!sr.width || document.body.classList.contains('menu-open') || document.body.classList.contains('drawer-open')) return 1;
+    return 0; // de chat scrolt binnen een eigen vak: groot zolang de begroeting zichtbaar is, daarna in het logo
+  }
+  function fly(dt) {
+    var t = targetP();
+    if (st.p < 0 || reduce) st.p = t; else st.p += (t - st.p) * (1 - Math.exp(-dt * CFG.flySmoothing));
+    if (Math.abs(st.p - t) < 0.0005) st.p = t;
+    var e = st.p * st.p * (3 - 2 * st.p); // smoothstep
+    var sr = spot.getBoundingClientRect(), mr = mark.getBoundingClientRect();
+    var ex = mr.left + mr.width / 2, ey = mr.top + mr.height / 2;
+    var sx = sr.width ? sr.left + sr.width / 2 : ex, sy = sr.width ? sr.top + sr.height / 2 : ey;
+    var qx = sx, qy = ey; // kwadratische bezier: eerst omhoog, dan opzij naar het logo
+    var x = (1 - e) * (1 - e) * sx + 2 * (1 - e) * e * qx + e * e * ex;
+    var y = (1 - e) * (1 - e) * sy + 2 * (1 - e) * e * qy + e * e * ey;
+    var k1 = (mr.width / 2 * CFG.dockScale) / (CFG.atomSize * S0), k = 1 + (k1 - 1) * e;
+    cv.style.transform = 'translate(' + (x - S0 * k / 2) + 'px,' + (y - S0 * k / 2) + 'px) scale(' + k + ')';
+    logo.classList.toggle('has-orb', e > 0.85); // verbergt het logo-svg zodra het atoom er bijna is
+    st.k = k;
+  }
+
+  /* ---------- Animatielus ---------- */
+  function frame(now) {
+    raf = 0;
+    if (document.hidden) { last = 0; return; }
+    var dt = last ? clamp((now - last) / 1000, 0.0005, 0.05) : 1 / 60; last = now;
+    if (!reduce) {
+      st.T += dt; st.spin += dt * (CFG.spin + st.kick * 2.5);
+      st.kick *= Math.exp(-dt * 2.2);
+      st.pv += (-170 * st.pulse - 11 * st.pv) * dt; st.pulse += st.pv * dt; // veer voor de klik-pulse
+      st.lx += (st.tlx - st.lx) * (1 - Math.exp(-dt * 5)); st.ly += (st.tly - st.ly) * (1 - Math.exp(-dt * 5));
+    }
+    fly(dt); draw();
+    if (!reduce) raf = requestAnimationFrame(frame);
+  }
+  function wake() { if (!raf && !document.hidden) raf = requestAnimationFrame(frame); }
+  function resize() {
+    var sr = spot.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (sr.height) S0 = Math.round(Math.min(sr.width, sr.height)); // canvas = vierkant ter hoogte van de hero-plek
+    cv.style.width = cv.style.height = S0 + 'px';
+    cv.width = cv.height = Math.round(S0 * dpr);
+    fly(0); draw(); wake();
+  }
+
+  /* ---------- Interactie: leunen naar de muis, klik = pulse ---------- */
+  function hit(e) {
+    var r = cv.getBoundingClientRect(), x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
+    return { x: x, y: y, d: Math.hypot(x, y) / (r.width * CFG.atomSize) };
+  }
+  window.addEventListener('pointermove', function (e) {
+    var h = hit(e), k = cv.getBoundingClientRect().width / S0;
+    if (h.d < 2.2) { var f = clamp(1 - h.d / 2.2, 0, 1); st.tlx = h.x / k * 0.08 * f; st.tly = h.y / k * 0.08 * f; } else { st.tlx = st.tly = 0; }
+    wake();
+  }, { passive: true });
+  window.addEventListener('pointerdown', function (e) {
+    if (reduce) return;
+    var onLogo = e.target.closest && e.target.closest('.logo');
+    if (!onLogo && (hit(e).d > 1.1 || (e.target.closest && e.target.closest('a,button,input,textarea,select,label')))) return;
+    st.pv += 0.9; st.kick = 1.2; wake();
+  }, { passive: true });
+
+  document.addEventListener('visibilitychange', function () { last = 0; wake(); });
+  window.addEventListener('resize', resize);
+  document.addEventListener('scroll', function () { if (reduce) fly(0); wake(); }, { passive: true, capture: true });
+  new MutationObserver(readTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  new MutationObserver(function () { readTheme(); fly(0); }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readTheme);
+  readTheme(); resize();
+})();
+
 </script>
 </body>
 </html>
