@@ -622,11 +622,41 @@ const NUM=[
 ];
 const num=(k,l,h,step)=>`<div class="fld"><label for="f_${k}">${l}</label><input type="number" id="f_${k}" data-k="${k}" step="${step}" placeholder="standaard" value="${esc(S[k])}"><div class="h">${h}</div></div>`;
 const chk=(k,t,d)=>`<label class="chk"><input type="checkbox" data-k="${k}"${S[k]?' checked':''}><span><b>${t}</b><small>${d}</small></span></label>`;
+const SHARED_KEYS=['baseUrl','model','system','temperature','top_p','top_k','min_p','max_tokens','frequency_penalty','presence_penalty','repeat_penalty','seed','stop','stream','historyLimit','noThink','extraBody'];
+let shared={available:false,configured:false},isAdmin=false,adminPw='';
+try{adminPw=sessionStorage.getItem('lai.pw')||''}catch{}
+const stash=v=>{try{v?sessionStorage.setItem('lai.pw',v):sessionStorage.removeItem('lai.pw')}catch{}};
+async function api(body){
+  try{
+    const r=await fetch('chat-config.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    return await r.json();
+  }catch{return {ok:false,error:'Geen antwoord van de server (chat-config.php).'}}
+}
+async function loadShared(){
+  try{
+    const r=await fetch('chat-config.php',{cache:'no-store'});
+    const j=await r.json();
+    if(!j||j.ok!==true)throw 0;
+    shared={available:true,configured:!!j.configured};
+    if(j.configured){for(const k of SHARED_KEYS)if(j.config&&k in j.config)S[k]=j.config[k]}
+    if(adminPw&&j.configured){const v=await api({action:'verify',password:adminPw});isAdmin=!!v.ok;if(!isAdmin){adminPw='';stash('')}}
+  }catch{shared={available:false,configured:false}}
+}
+const locked=()=>shared.configured&&!isAdmin;
+function adminHTML(){
+  const pw=(id,l,h)=>`<div class="fld"><label for="${id}">${l}</label><input type="password" id="${id}" autocomplete="${id==='pw_new'?'new-password':'current-password'}" placeholder="••••••••">${h?`<div class="h">${h}</div>`:''}</div>`;
+  let h='<h3>Delen met iedereen</h3>';
+  if(!shared.available)return h+'<p class="h" style="color:var(--mut);font-size:13px">Delen werkt alleen als deze pagina op een webserver met PHP staat, met <code>chat-config.php</code> in dezelfde map. Nu gebruik je alleen lokale instellingen.</p>';
+  if(!shared.configured)h+=pw('pw_in','Kies een beheerderswachtwoord','Minstens 8 tekens. Na opslaan gebruikt iedereen die deze pagina opent automatisch de verbinding en instellingen hierboven. Doe dit meteen na het uploaden: wie het eerst opslaat, bepaalt het wachtwoord.')+'<div class="rowb"><button class="btn pri" data-adm="save">Opslaan voor iedereen</button></div>';
+  else if(!isAdmin)h=h.replace('Delen met iedereen','Beheerder')+pw('pw_in','Wachtwoord','Ontgrendel om verbinding, model en parameters voor iedereen te wijzigen.')+'<div class="rowb"><button class="btn pri" data-adm="unlock">Ontgrendelen</button></div>';
+  else h+='<p class="h" style="color:var(--ok);font-size:13px;margin:0 0 12px">Je bent beheerder. Wijzigingen hierboven gelden pas voor iedereen na opslaan.</p>'+pw('pw_new','Nieuw wachtwoord (optioneel)','Laat leeg om het wachtwoord te behouden.')+'<div class="rowb"><button class="btn pri" data-adm="save">Opslaan voor iedereen</button><button class="btn" data-adm="logout">Uitloggen</button><button class="btn danger" data-adm="clear">Delen stoppen</button></div>';
+  return h+'<div class="cstat" id="admStat" style="margin-top:10px"></div>';
+}
 function renderDrawer(){
-  $('#dBody').innerHTML=`
+  const conn_=`
   <h3>Verbinding</h3>
-  <div class="fld"><label for="f_baseUrl">Base URL</label><input type="text" id="f_baseUrl" data-k="baseUrl" value="${esc(S.baseUrl)}" spellcheck="false"><div class="h">LM Studio standaard: <code>http://localhost:1234/v1</code>. Andere pc op je netwerk: <code>http://192.168.x.x:1234/v1</code>.</div></div>
-  <div class="fld"><label for="f_apiKey">API-sleutel</label><input type="password" id="f_apiKey" data-k="apiKey" value="${esc(S.apiKey)}" autocomplete="off" placeholder="optioneel"><div class="h">LM Studio vraagt er normaal geen. Wordt als Bearer-token meegestuurd.</div></div>
+  <div class="fld"><label for="f_baseUrl">Base URL</label><input type="text" id="f_baseUrl" data-k="baseUrl" value="${esc(S.baseUrl)}" spellcheck="false"><div class="h">LM Studio standaard: <code>http://localhost:1234/v1</code>. Andere pc op je netwerk: <code>http://192.168.x.x:1234/v1</code>. Voor bezoekers van buiten je netwerk moet dit een publiek bereikbaar (https) adres zijn.</div></div>
+  <div class="fld"><label for="f_apiKey">API-sleutel</label><input type="password" id="f_apiKey" data-k="apiKey" value="${esc(S.apiKey)}" autocomplete="off" placeholder="optioneel"><div class="h">LM Studio vraagt er normaal geen. Wordt als Bearer-token meegestuurd en nooit gedeeld.</div></div>
   <div class="fld"><label for="f_model">Model</label><input type="text" id="f_model" data-k="model" value="${esc(S.model)}" spellcheck="false" placeholder="bijv. qwen3-8b"><div class="mods" id="mods"></div><div class="h">Leeg = het model dat in LM Studio geladen is.</div></div>
   <div class="rowb"><button class="btn pri" id="test">Test verbinding</button><span class="cstat" id="cstat"></span></div>
 
@@ -639,23 +669,57 @@ function renderDrawer(){
 
   <h3>Gedrag</h3>
   ${chk('stream','Streamen','Toon het antwoord woord voor woord terwijl het binnenkomt.')}
-  ${chk('showThinking','Redenering tonen','Toon &lt;think&gt;-blokken (Qwen3 e.d.) in een uitklapbaar blok.')}
-  ${chk('noThink','Denkmodus uitzetten (Qwen3)','Voegt <code>/no_think</code> toe aan je laatste bericht voor snellere antwoorden.')}
-  ${chk('enterToSend','Enter verzendt','Aan: Enter verzendt, Shift+Enter nieuwe regel. Uit: Ctrl/Cmd+Enter verzendt.')}
+  ${chk('noThink','Denkmodus uitzetten (Qwen3)','Voegt <code>/no_think</code> toe aan het laatste bericht voor snellere antwoorden.')}
   <div class="fld"><label for="f_historyLimit">Max. berichten meesturen</label><input type="number" id="f_historyLimit" data-k="historyLimit" min="1" step="1" placeholder="alles" value="${esc(S.historyLimit)}"><div class="h">Beperk de context tot de laatste N berichten. Leeg = het hele gesprek.</div></div>
-  <div class="fld"><label for="f_theme">Thema</label><select id="f_theme" data-k="theme"><option value="auto">Automatisch</option><option value="light">Licht</option><option value="dark">Donker</option></select></div>
 
   <h3>Geavanceerd</h3>
-  <div class="fld"><label for="f_extraBody">Extra JSON in het verzoek</label><textarea id="f_extraBody" data-k="extraBody" class="code-t" spellcheck="false" placeholder='{"chat_template_kwargs": {"enable_thinking": false}}'>${esc(S.extraBody)}</textarea><div class="h">Wordt samengevoegd met de request-body van <code>/chat/completions</code> en overschrijft bovenstaande waarden.</div></div>
+  <div class="fld"><label for="f_extraBody">Extra JSON in het verzoek</label><textarea id="f_extraBody" data-k="extraBody" class="code-t" spellcheck="false" placeholder='{"chat_template_kwargs": {"enable_thinking": false}}'>${esc(S.extraBody)}</textarea><div class="h">Wordt samengevoegd met de request-body van <code>/chat/completions</code> en overschrijft bovenstaande waarden.</div></div>`;
+  const lockedInfo=`
+  <h3>Verbinding</h3>
+  <p class="h" style="font-size:13.5px;color:var(--ink2);margin:0">Deze chatbot is ingesteld door de beheerder${S.model?` (model: <b>${esc(S.model)}</b>)`:''}. Je hoeft niets in te stellen.</p>
+  <div class="rowb" style="margin-top:10px"><button class="btn" id="test">Test verbinding</button><span class="cstat" id="cstat"></span></div>`;
+  $('#dBody').innerHTML=(locked()?lockedInfo:conn_)+`
+
+  <h3>Weergave</h3>
+  ${chk('showThinking','Redenering tonen','Toon &lt;think&gt;-blokken (Qwen3 e.d.) in een uitklapbaar blok.')}
+  ${chk('enterToSend','Enter verzendt','Aan: Enter verzendt, Shift+Enter nieuwe regel. Uit: Ctrl/Cmd+Enter verzendt.')}
+  <div class="fld"><label for="f_theme">Thema</label><select id="f_theme" data-k="theme"><option value="auto">Automatisch</option><option value="light">Licht</option><option value="dark">Donker</option></select></div>
 
   <h3>Gegevens</h3>
   <div class="rowb">
     <button class="btn" id="exp">Alles exporteren</button><button class="btn" id="imp">Importeren</button>
-    <button class="btn danger" id="wipe">Alle gesprekken wissen</button><button class="btn danger" id="reset">Standaardwaarden</button>
+    <button class="btn danger" id="wipe">Alle gesprekken wissen</button>${locked()?'':'<button class="btn danger" id="reset">Standaardwaarden</button>'}
   </div>
-  <p class="h" style="margin-top:12px;color:var(--mut);font-size:12.5px">Alles wordt opgeslagen in de localStorage van deze browser; er wordt niets naar een externe server gestuurd.</p>`;
+  <p class="h" style="margin-top:12px;color:var(--mut);font-size:12.5px">Je gesprekken worden alleen in de localStorage van deze browser bewaard.</p>
+  `+adminHTML();
   $('#f_theme').value=S.theme;
   renderModelChips();
+}
+async function adminAction(kind){
+  const stat=$('#admStat'),say=(t,c)=>{if(stat){stat.className='cstat '+(c||'');stat.textContent=t}};
+  const val=id=>($('#'+id)?.value||'');
+  if(kind==='logout'){isAdmin=false;adminPw='';stash('');renderDrawer();return}
+  if(kind==='unlock'){
+    const pw=val('pw_in');if(!pw)return;
+    const r=await api({action:'verify',password:pw});
+    if(r.ok){isAdmin=true;adminPw=pw;stash(pw);renderDrawer();validateExtra()}else say(r.error||'Onjuist wachtwoord.','bad');
+    return;
+  }
+  if(kind==='clear'){
+    if(!confirm('Delen stoppen? Bezoekers moeten daarna zelf instellen.'))return;
+    const r=await api({action:'clear',password:adminPw});
+    if(r.ok){shared.configured=false;isAdmin=false;adminPw='';stash('');renderDrawer();validateExtra()}else say(r.error||'Mislukt.','bad');
+    return;
+  }
+  if(kind==='save'){
+    const first=!shared.configured,pw=first?val('pw_in'):adminPw,np=first?'':val('pw_new');
+    if(S.extraBody.trim()){try{const v=JSON.parse(S.extraBody);if(!v||typeof v!=='object'||Array.isArray(v))throw 0}catch{say('Extra JSON is ongeldig.','bad');return}}
+    const config={};for(const k of SHARED_KEYS)config[k]=S[k];
+    say('Opslaan…');
+    const r=await api({action:'save',password:pw,newPassword:np||undefined,config});
+    if(r.ok){shared.configured=true;isAdmin=true;adminPw=np||pw;stash(adminPw);renderDrawer();validateExtra();const s=$('#admStat');if(s){s.className='cstat ok';s.textContent='Opgeslagen: dit geldt nu voor iedereen.'}}
+    else say(r.error||'Opslaan mislukt.','bad');
+  }
 }
 function renderModelChips(){
   const el=$('#mods');if(!el)return;
@@ -679,6 +743,7 @@ $('#dBody').addEventListener('input',e=>{
 $('#dBody').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   if(b.dataset.m){S.model=b.dataset.m;saveS();$('#f_model').value=S.model;renderChrome();renderModelChips()}
+  else if(b.dataset.adm)adminAction(b.dataset.adm);
   else if(b.id==='test')loadModels(true);
   else if(b.id==='exp')download('lokale-ai-gesprekken.json',JSON.stringify({version:1,exported:new Date().toISOString(),chats},null,1),'application/json');
   else if(b.id==='imp')$('#file').click();
@@ -696,7 +761,7 @@ $('#theme').addEventListener('click',()=>{S.theme=document.documentElement.datas
 /* ---------- start ---------- */
 if(!chats.some(c=>c.id===curId))curId=null;
 applyTheme();renderChrome();renderSide();renderThread();updSend();
-loadModels(false);
+loadShared().then(()=>{renderChrome();loadModels(false)});
 </script>
 </body>
 </html>
