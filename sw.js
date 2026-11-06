@@ -1,6 +1,6 @@
 /* Rivsenn A.I. chat: service worker. Bewaart alleen de app-bestanden; chat-verzoeken
    en de gedeelde instellingen (chat-config.php) gaan altijd rechtstreeks naar het netwerk. */
-const VERSION = 'rv-chat-v1';
+const VERSION = 'rv-chat-v2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -11,7 +11,7 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   const r = e.request, u = new URL(r.url);
-  if (r.method !== 'GET' || u.origin !== location.origin || u.pathname.endsWith('chat-config.php')) return;
+  if (r.method !== 'GET' || u.origin !== location.origin || /chat-(config|run)\.php$/.test(u.pathname)) return;
   if (r.mode === 'navigate') {
     // pagina: eerst netwerk (altijd de nieuwste versie), anders de bewaarde kopie
     e.respondWith(fetch(r).then(res => { const cp = res.clone(); caches.open(VERSION).then(c => c.put('index.html', cp)); return res; })

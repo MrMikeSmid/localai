@@ -321,7 +321,7 @@ const LS={
 const DEFAULTS={
   baseUrl:'http://localhost:1234/v1',apiKey:'',model:'',system:'',
   temperature:'0.7',top_p:'',top_k:'',min_p:'',max_tokens:'',frequency_penalty:'',presence_penalty:'',repeat_penalty:'',seed:'',
-  stop:'',stream:true,historyLimit:'',noThink:false,showThinking:true,enterToSend:true,extraBody:'',theme:'auto'
+  stop:'',stream:true,serverRun:true,historyLimit:'',noThink:false,showThinking:true,enterToSend:true,extraBody:'',theme:'auto'
 };
 let S={...DEFAULTS,...LS.get('lai.settings',{})};
 let chats=LS.get('lai.chats',[]);
@@ -427,6 +427,7 @@ function aiBody(m){
   if(p.answer)h+=md(p.answer);
   else if(m._live&&!p.think)h+='<span class="dots"><i></i><i></i><i></i></span>';
   if(m.finish==='length')h+='<div class="note">Antwoord afgekapt: maximum aantal tokens bereikt. Verhoog "Max tokens" in de instellingen.</div>';
+  if(m.interrupted)h+='<div class="note">Onderbroken: de pagina werd gesloten tijdens dit antwoord. Kies "Opnieuw genereren" om het te herhalen.</div>';
   if(m.error)h+=`<div class="error">${esc(m.error)}</div>`;
   return h;
 }
@@ -540,15 +541,108 @@ function buildBody(c){
 function setBusy(b){busy=b;$('#send').innerHTML=b?ic.stop:ic.up;$('#send').title=b?'Stoppen':'Verzenden';updSend()}
 function updSend(){$('#send').disabled=!busy&&(procN>0||(!inp.value.trim()&&!pending.length))}
 
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let serverOk=true;
+const useServer=()=>serverOk&&shared.available&&shared.configured&&S.serverRun!==false;
+function livePainter(c,m){
+  let raf=0,lastSave=Date.now();
+  const paint=()=>{
+    raf=0;
+    if(Date.now()-lastSave>3000){lastSave=Date.now();saveC()} // tussentijds bewaren: tekst gaat niet verloren
+    if(cur()!==c)return;
+    const b=thread.querySelector(`.msg[data-i="${c.messages.indexOf(m)}"] .body`);if(!b)return;
+    const stick=nearBottom();b.innerHTML=aiBody(m);if(stick)toBottom();
+  };
+  return {sched(){if(!raf)raf=requestAnimationFrame(paint)},stop(){if(raf)cancelAnimationFrame(raf);raf=0}};
+}
+function finishGen(c,m,stats){
+  delete m._live;delete m.job;delete m.running;
+  if(stats&&stats.tokens)m.stats=stats;
+  if(!m.content&&!m.reasoning&&!m.error){const i=c.messages.indexOf(m);if(i>=0)c.messages.splice(i,1)}
+  ctrl=null;c.updated=Date.now();saveC();
+  setBusy(false);renderThread();renderSide();renderChrome();toBottom();
+}
 async function generate(){
   const c=cur();
   const m={role:'assistant',content:'',reasoning:'',model:S.model,_live:true};
   c.messages.push(m);c.updated=Date.now();saveC();renderThread();renderSide();toBottom();
   setBusy(true);
-  const el=thread.lastElementChild,bodyEl=el.querySelector('.body');
-  let raf=0;
-  const paint=()=>{raf=0;const stick=nearBottom();bodyEl.innerHTML=aiBody(m);if(stick)toBottom()};
-  const sched=()=>{if(!raf)raf=requestAnimationFrame(paint)};
+  let handled=false;
+  if(useServer())handled=await runServer(c,m);
+  if(!handled)await runDirect(c,m);
+}
+/* antwoord op de server laten lopen (chat-run.php) */
+async function runServer(c,m){
+  try{
+    const res=await fetch('chat-run.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'start',body:buildBody(c)})});
+    const r=await res.json().catch(()=>null);
+    if(!res.ok||!r||!r.ok){
+      if(!r||r.fallback||res.status===404||res.status===501){serverOk=false;return false}
+      throw new Error(r.error||'HTTP '+res.status);
+    }
+    m.job=r.id;saveC();
+  }catch(e){
+    if(e instanceof TypeError){serverOk=false;return false}
+    m.error=explain(e);finishGen(c,m);return true;
+  }
+  return followJob(c,m);
+}
+async function followJob(c,m){
+  const id=m.job;ctrl=new AbortController();
+  const P=livePainter(c,m);let fails=0,last=null,fallback=false;
+  try{
+    for(;;){
+      if(ctrl.signal.aborted)break;
+      let r;
+      try{
+        const res=await fetch('chat-run.php?id='+id+'&_='+Date.now(),{cache:'no-store',signal:ctrl.signal});
+        r=await res.json();
+        if(!res.ok||!r.ok)throw Object.assign(new Error(r.error||'HTTP '+res.status),{http:res.status});
+        fails=0;
+      }catch(e){
+        if(e.name==='AbortError')break;
+        if(e.http===404){m.error=m.content||m.reasoning?'De server heeft dit antwoord niet afgemaakt.':e.message;break}
+        if(++fails>=30){m.error=explain(e);break}
+        await sleep(1500);continue; // tijdelijk geen verbinding: blijf het opnieuw proberen
+      }
+      last=r;
+      m.content=r.content||'';m.reasoning=r.reasoning||'';if(r.finish)m.finish=r.finish;
+      if(m.content||m.reasoning)P.sched();
+      if(r.status!=='running'){
+        if(r.status==='error'){
+          if(r.unreachable&&!m.content&&!m.reasoning){fallback=true;serverOk=false}
+          else m.error=r.error||'Fout op de server.';
+        }
+        break;
+      }
+      await sleep(400);
+    }
+  }finally{
+    P.stop();
+    if(ctrl&&ctrl.signal.aborted){try{fetch('chat-run.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'cancel',id})})}catch{}}
+  }
+  if(fallback){delete m.job;return false}
+  let stats=null;
+  if(last){
+    const tokens=(last.usage&&last.usage.completion_tokens)||0,secs=last.ended&&last.started?last.ended-last.started:0;
+    stats={tokens,secs,tps:tokens&&last.first&&last.ended>last.first?tokens/(last.ended-last.first):0};
+    conn='ok';
+  }
+  finishGen(c,m,stats);
+  return true;
+}
+function resumeJobs(){
+  for(const c of chats)for(const m of c.messages){
+    if(m.role!=='assistant')continue;
+    if(m.job&&!busy){m._live=true;setBusy(true);followJob(c,m);continue}
+    if(m.running||m.job){delete m.running;delete m.job;m.interrupted=true} // rechtstreekse verbinding verbroken door sluiten van de pagina
+  }
+  saveC();
+}
+/* antwoord rechtstreeks vanuit de browser ophalen */
+async function runDirect(c,m){
+  m.running=true;
+  const P=livePainter(c,m);
   ctrl=new AbortController();
   const t0=performance.now();let t1=0,chunks=0,usage=null;
   try{
@@ -574,7 +668,7 @@ async function generate(){
           if(ch){
             const dl=ch.delta||{};
             const rc=dl.reasoning_content||dl.reasoning||'';
-            if(dl.content||rc){if(!t1)t1=performance.now();chunks++;m.content+=dl.content||'';m.reasoning+=rc;sched()}
+            if(dl.content||rc){if(!t1)t1=performance.now();chunks++;m.content+=dl.content||'';m.reasoning+=rc;P.sched()}
             if(ch.finish_reason)m.finish=ch.finish_reason;
           }
           if(j.usage)usage=j.usage;
@@ -589,16 +683,11 @@ async function generate(){
   }catch(e){
     if(e.name!=='AbortError')m.error=explain(e),conn=e instanceof TypeError?'bad':conn;
   }finally{
-    if(raf)cancelAnimationFrame(raf);
-    const t2=performance.now();
-    delete m._live;
-    const tokens=usage?.completion_tokens||chunks;
-    if(tokens){m.stats={tokens,secs:(t2-t0)/1000,tps:t1&&t2>t1?tokens/((t2-t1)/1000):0}}
-    if(!m.content&&!m.reasoning&&!m.error){c.messages.pop()}
-    ctrl=null;c.updated=Date.now();saveC();
-    setBusy(false);renderThread();renderSide();renderChrome();
-    if(nearBottom()||true)toBottom();
+    P.stop();
+    const t2=performance.now(),tokens=(usage&&usage.completion_tokens)||chunks;
+    finishGen(c,m,tokens?{tokens,secs:(t2-t0)/1000,tps:t1&&t2>t1?tokens/((t2-t1)/1000):0}:null);
   }
+  return true;
 }
 async function send(text){
   text=text.trim();if((!text&&!pending.length)||busy||procN)return;
@@ -735,7 +824,7 @@ const NUM=[
 ];
 const num=(k,l,h,step)=>`<div class="fld"><label for="f_${k}">${l}</label><input type="number" id="f_${k}" data-k="${k}" step="${step}" placeholder="standaard" value="${esc(S[k])}"><div class="h">${h}</div></div>`;
 const chk=(k,t,d)=>`<label class="chk"><input type="checkbox" data-k="${k}"${S[k]?' checked':''}><span><b>${t}</b><small>${d}</small></span></label>`;
-const SHARED_KEYS=['baseUrl','model','system','temperature','top_p','top_k','min_p','max_tokens','frequency_penalty','presence_penalty','repeat_penalty','seed','stop','stream','historyLimit','noThink','extraBody'];
+const SHARED_KEYS=['baseUrl','model','system','temperature','top_p','top_k','min_p','max_tokens','frequency_penalty','presence_penalty','repeat_penalty','seed','stop','stream','serverRun','historyLimit','noThink','extraBody'];
 let shared={available:false,configured:false},isAdmin=false,adminPw='';
 try{adminPw=sessionStorage.getItem('lai.pw')||''}catch{}
 const stash=v=>{try{v?sessionStorage.setItem('lai.pw',v):sessionStorage.removeItem('lai.pw')}catch{}};
@@ -782,6 +871,7 @@ function renderDrawer(){
 
   <h3>Gedrag</h3>
   ${chk('stream','Streamen','Toon het antwoord woord voor woord terwijl het binnenkomt.')}
+  ${chk('serverRun','Antwoorden op de server laten doorlopen','Het antwoord loopt door als je de pagina sluit en staat klaar als je terugkomt. Werkt alleen met gedeelde instellingen en een Base URL die ook vanaf je webserver bereikbaar is (dus niet 192.168.x.x). Anders gaat het rechtstreeks vanuit de browser.')}
   ${chk('noThink','Denkmodus uitzetten (Qwen3)','Voegt <code>/no_think</code> toe aan het laatste bericht voor snellere antwoorden.')}
   <div class="fld"><label for="f_historyLimit">Max. berichten meesturen</label><input type="number" id="f_historyLimit" data-k="historyLimit" min="1" step="1" placeholder="alles" value="${esc(S.historyLimit)}"><div class="h">Beperk de context tot de laatste N berichten. Leeg = het hele gesprek.</div></div>
 
@@ -827,9 +917,9 @@ async function adminAction(kind){
   if(kind==='save'){
     const first=!shared.configured,pw=first?val('pw_in'):adminPw,np=first?'':val('pw_new');
     if(S.extraBody.trim()){try{const v=JSON.parse(S.extraBody);if(!v||typeof v!=='object'||Array.isArray(v))throw 0}catch{say('Extra JSON is ongeldig.','bad');return}}
-    const config={};for(const k of SHARED_KEYS)config[k]=S[k];
+    const config={};for(const k of SHARED_KEYS)config[k]=S[k];const apiKey=S.apiKey;
     say('Opslaan…');
-    const r=await api({action:'save',password:pw,newPassword:np||undefined,config});
+    const r=await api({action:'save',password:pw,newPassword:np||undefined,config,apiKey});
     if(r.ok){shared.configured=true;isAdmin=true;adminPw=np||pw;stash(adminPw);renderDrawer();validateExtra();const s=$('#admStat');if(s){s.className='cstat ok';s.textContent='Opgeslagen: dit geldt nu voor iedereen.'}}
     else say(r.error||'Opslaan mislukt.','bad');
   }
@@ -966,10 +1056,15 @@ $('#install').addEventListener('click',async()=>{
 showInstall();
 if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 
+addEventListener('pagehide',()=>{
+  const c=cur(),m=c&&c.messages[c.messages.length-1];
+  if(busy&&m&&m.running&&!m.job)saveC(); // inhoud tot nu toe bewaren; bij heropenen wordt het als onderbroken getoond
+});
+
 /* ---------- start ---------- */
 if(!chats.some(c=>c.id===curId))curId=null;
 applyTheme();renderChrome();renderSide();renderThread();updSend();syncMenuTabs();
-loadShared().then(()=>{renderChrome();loadModels(false)});
+loadShared().then(()=>{resumeJobs();renderChrome();renderThread();loadModels(false)});
 </script>
 <script>
 /* Rivsenn A.I. · atoom-botje (zie HANDOFF.md §7)
