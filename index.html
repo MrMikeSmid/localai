@@ -167,6 +167,10 @@ canvas.orb{position:fixed;left:0;top:0;width:320px;height:320px;transform-origin
 
 /* bijlagen */
 .plus-wrap{position:relative}
+.cmdhint{position:absolute;left:0;right:0;bottom:calc(100% + 6px);background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:6px;z-index:20}
+.cmdhint button{display:flex;gap:12px;align-items:baseline;width:100%;padding:10px 12px;border-radius:12px;font-size:13px;text-align:left}
+.cmdhint button:hover,.cmdhint button:focus-visible{background:var(--soft)}
+.cmdhint b{font-weight:500}.cmdhint span{color:var(--muted);font-size:12px}
 .plus{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--fg)}
 .plus:hover,.plus[aria-expanded=true]{border-color:var(--fg)}
 .popover{position:absolute;left:0;bottom:calc(100% + 8px);min-width:210px;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:6px;z-index:20}
@@ -261,12 +265,13 @@ canvas.orb{position:fixed;left:0;top:0;width:320px;height:320px;transform-origin
         <div class="orb-spot" id="orb-spot"></div>
         <canvas class="orb" id="orb" aria-hidden="true"></canvas>
         <h1>Hoi, waar kan ik je mee helpen?</h1>
-        <p class="intro">Ik draai op een eigen, lokaal taalmodel. Stel een vraag, of voeg een foto, video of bestand toe.</p>
+        <p class="intro">Ik draai op een eigen, lokaal taalmodel. Stel een vraag, of voeg een foto, video of bestand toe. Typ <b>/help</b> voor een overzicht van alles wat ik kan.</p>
       </section>
       <div class="thread" id="thread"></div>
     </div></div>
   </div>
-  <div class="comp gutter"><div class="wrap">
+  <div class="comp gutter"><div class="wrap" style="position:relative">
+    <div class="cmdhint" id="cmdhint" hidden></div>
     <div class="box" id="box">
       <div class="atts" id="atts" hidden></div>
       <textarea id="inp" rows="1" placeholder="Stel een vraag…" autofocus></textarea>
@@ -441,6 +446,7 @@ function footHTML(m,i,c){
   if(m._live)return '';
   const last=i===c.messages.length-1;
   let h=`<button class="ibtn" data-a="copy" title="Kopiëren">${ic.copy}</button>`;
+  if(m.local)return h;
   if(last)h+=`<button class="ibtn" data-a="regen" title="Opnieuw genereren">${ic.refresh}</button>`;
   if(m.stats){const s=m.stats;h+=`<span class="stats">${[s.tokens?s.tokens+' tokens':'',s.tps?s.tps.toFixed(1)+' tok/s':'',s.secs?s.secs.toFixed(1)+'s':'',m.model||''].filter(Boolean).join(' · ')}</span>`}
   return h;
@@ -453,7 +459,7 @@ function attsHTML(m){
     :`<span class="achip"><span>${esc(a.name)}</span></span>`).join('')+'</div>';
 }
 function msgHTML(m,i,c){
-  if(m.role==='user')return `<div class="msg user" data-i="${i}">${attsHTML(m)}${m.content?`<div class="bubble">${esc(m.content)}</div>`:''}<div class="acts"><button class="ibtn" data-a="edit" title="Bewerken">${ic.pencil}</button><button class="ibtn" data-a="copy" title="Kopiëren">${ic.copy}</button></div></div>`;
+  if(m.role==='user')return `<div class="msg user" data-i="${i}">${attsHTML(m)}${m.content?`<div class="bubble">${esc(m.content)}</div>`:''}<div class="acts">${m.local?'':`<button class="ibtn" data-a="edit" title="Bewerken">${ic.pencil}</button>`}<button class="ibtn" data-a="copy" title="Kopiëren">${ic.copy}</button></div></div>`;
   return `<div class="msg ai" data-i="${i}"><div class="body">${aiBody(m)}</div><div class="acts foot keep">${footHTML(m,i,c)}</div></div>`;
 }
 function renderThread(){
@@ -528,7 +534,7 @@ function userParts(x){
   return imgs.length?[{type:'text',text},...imgs.map(u=>({type:'image_url',image_url:{url:u}}))]:text;
 }
 function buildBody(c){
-  let hist=c.messages.slice(0,-1).map(x=>({role:x.role,content:x.role==='assistant'?split(x).answer:userParts(x)}));
+  let hist=c.messages.filter(x=>!x.local).slice(0,-1).map(x=>({role:x.role,content:x.role==='assistant'?split(x).answer:userParts(x)}));
   hist=hist.filter(x=>!(x.role==='assistant'&&!x.content));
   const lim=parseInt(S.historyLimit);if(lim>0)hist=hist.slice(-lim);
   if(S.noThink&&hist.length&&hist[hist.length-1].role==='user'){
@@ -703,12 +709,49 @@ async function runDirect(c,m){
   }
   return true;
 }
+const COMMANDS=[{names:['/help','/hulp','/functies',"/commando's",'/commandos','/?'],info:'Overzicht van commando\'s en functies',run:showHelp}];
+function findCommand(text){
+  const w=text.trim().toLowerCase().split(/\s+/)[0];
+  return COMMANDS.find(c=>c.names.includes(w))||null;
+}
+function helpText(){
+  const toolsOn=shared.available&&shared.configured&&serverOk&&S.serverRun!==false&&S.toolMode!=='off';
+  return `## Commando's
+- \`/help\` toont dit overzicht (ook \`/hulp\`, \`/functies\` en \`/?\`)
+
+## Wat je me kunt vragen
+${toolsOn?'De AI-tools staan **aan** (modus: '+(S.toolMode==='native'?'native':'router')+'). Dit kan ik live voor je doen:':'De AI-tools staan nu **uit** of zijn niet beschikbaar op deze server. Onderstaande vragen beantwoordt het model dan zonder live gegevens.'}
+
+- **Datum en tijd**: "Welke dag is het vandaag?" of "Hoe laat is het in Tokio?"
+- **Zoeken op internet**: "Zoek het laatste nieuws over Qwen". De bronnen staan onder het antwoord. Werkt alleen als de beheerder een zoekdienst heeft ingesteld.
+- **Een pagina lezen**: plak een https-link, bijvoorbeeld "Vat https://voorbeeld.nl/artikel samen".
+- **Eerdere gesprekken**: "Wat zei ik eerder over mijn dashboard?" (alleen als de server gesprekken bewaart).
+- **Je gesprekken**: "Hoeveel gesprekken heb ik?" of "Toon mijn recente gesprekken".
+- **Status van de AI**: "Is de AI-server online?"
+
+## Bijlagen
+Met de plusknop links van het invoerveld voeg je foto's, video's (als beelden) en tekst- of codebestanden toe. Plakken (Ctrl+V) en slepen werkt ook.
+
+## Gebruik
+- **Enter** verstuurt${S.enterToSend?', **Shift+Enter** geeft een nieuwe regel':' niet; **Ctrl+Enter** verstuurt'}. Dit stel je in onder Instellingen, Weergave.
+- Bij je berichten: kopiëren, bewerken en opnieuw genereren.
+- **Menu**: nieuw gesprek, instellingen, exporteren als Markdown en je gesprekkenlijst.
+- De maan- of zonknop wisselt tussen licht en donker.
+- Een antwoord loopt op de server door als je de pagina sluit (als dat is ingesteld).`;
+}
+function showHelp(text){
+  let c=cur();
+  if(!c){c={id:uid(),title:'Hulp',created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);curId=c.id}
+  c.messages.push({role:'user',content:text.trim(),local:true},{role:'assistant',content:helpText(),local:true});
+  c.updated=Date.now();inp.value='';autosize();$('#cmdhint').hidden=true;saveC();renderThread();renderSide();toBottom();
+}
 async function send(text){
+  if(!pending.length&&!busy&&/^\//.test(text.trim())){const cmd=findCommand(text);if(cmd){cmd.run(text);return}}
   text=text.trim();if((!text&&!pending.length)||busy||procN)return;
   let c=cur();
   if(!c){c={id:uid(),title:'Nieuw gesprek',created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);curId=c.id}
   const atts=pending;pending=[];renderAtts();
-  if(!c.messages.length)c.title=(text||atts[0].name).replace(/\s+/g,' ').slice(0,48)||'Nieuw gesprek';
+  if(!c.messages.some(x=>!x.local))c.title=(text||atts[0].name).replace(/\s+/g,' ').slice(0,48)||'Nieuw gesprek';
   const um={role:'user',content:text};
   if(atts.length){
     um.attachments=atts.map(a=>({kind:a.kind,name:a.name,thumb:a.thumb,text:a.text,cut:a.cut,n:a.imgs?a.imgs.length:0}));
@@ -720,13 +763,23 @@ async function send(text){
 }
 function regenerate(){
   if(busy)return;const c=cur();if(!c)return;
-  while(c.messages.length&&c.messages[c.messages.length-1].role==='assistant')c.messages.pop();
+  if(c.messages.length&&c.messages[c.messages.length-1].local)return;
+  while(c.messages.length&&c.messages[c.messages.length-1].role==='assistant'&&!c.messages[c.messages.length-1].local)c.messages.pop();
   if(c.messages.length)generate();
 }
 
 /* ---------- composer ---------- */
 function autosize(){inp.style.height='auto';inp.style.height=Math.min(inp.scrollHeight,220)+'px';updSend()}
 inp.addEventListener('input',autosize);
+const hintEl=$('#cmdhint');
+function updateHint(){
+  const v=inp.value;
+  const m=/^\/\S*$/.test(v)?COMMANDS.filter(c=>c.names.some(n=>n.startsWith(v.toLowerCase()))):[];
+  hintEl.hidden=!m.length||pending.length>0;
+  hintEl.innerHTML=m.map(c=>`<button type="button" data-cmd="${esc(c.names[0])}"><b>${esc(c.names[0])}</b><span>${esc(c.info)}</span></button>`).join('');
+}
+inp.addEventListener('input',updateHint);
+hintEl.addEventListener('click',e=>{const b=e.target.closest('[data-cmd]');if(!b)return;inp.value='';hintEl.hidden=true;send(b.dataset.cmd)});
 inp.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!e.isComposing){
     const go=S.enterToSend?!e.shiftKey:(e.ctrlKey||e.metaKey);
