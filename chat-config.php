@@ -26,7 +26,7 @@ const FIELDS = [
     'max_tokens' => ['n', 20], 'frequency_penalty' => ['n', 20], 'presence_penalty' => ['n', 20],
     'repeat_penalty' => ['n', 20], 'seed' => ['n', 20], 'historyLimit' => ['n', 20],
     'stop' => ['s', 2000], 'extraBody' => ['s', 20000],
-    'stream' => ['b', 0], 'noThink' => ['b', 0],
+    'stream' => ['b', 0], 'noThink' => ['b', 0], 'serverRun' => ['b', 0],
 ];
 
 $dir  = __DIR__ . '/storage';
@@ -76,6 +76,12 @@ function clean(array $in): array {
     return $c;
 }
 
+// Optionele API-sleutel voor chat-run.php; wordt alleen op de server bewaard en nooit teruggegeven.
+function apiKey(array $in, string $old): string {
+    $k = $in['apiKey'] ?? null;
+    return is_string($k) && trim($k) !== '' && strlen($k) <= 500 ? trim($k) : $old;
+}
+
 $stored = load($file);
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -107,7 +113,7 @@ if ($stored === null) {
     if ($action !== 'save') out(['ok' => false, 'error' => 'Nog niet ingesteld.'], 404);
     if (strlen($pw) < MIN_PW) out(['ok' => false, 'error' => 'Kies een wachtwoord van minstens ' . MIN_PW . ' tekens.'], 400);
     $cfg = clean(is_array($in['config'] ?? null) ? $in['config'] : []);
-    save($dir, $file, ['hash' => password_hash($pw, PASSWORD_DEFAULT), 'config' => $cfg]);
+    save($dir, $file, ['hash' => password_hash($pw, PASSWORD_DEFAULT), 'config' => $cfg, 'apiKey' => apiKey($in, '')]);
     out(['ok' => true, 'configured' => true, 'config' => $cfg]);
 }
 
@@ -123,7 +129,7 @@ if ($action === 'save') {
         if (strlen($new) < MIN_PW) out(['ok' => false, 'error' => 'Nieuw wachtwoord moet minstens ' . MIN_PW . ' tekens hebben.'], 400);
         $hash = password_hash($new, PASSWORD_DEFAULT);
     }
-    save($dir, $file, ['hash' => $hash, 'config' => $cfg]);
+    save($dir, $file, ['hash' => $hash, 'config' => $cfg, 'apiKey' => apiKey($in, (string)($stored['apiKey'] ?? ''))]);
     out(['ok' => true, 'configured' => true, 'config' => $cfg]);
 }
 
