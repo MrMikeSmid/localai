@@ -10,12 +10,23 @@
  *
  * Vereist: gedeelde instellingen (chat-config.php), php-curl, en een Base URL die vanaf
  * deze webserver bereikbaar is (dus geen 192.168.x.x thuisadres).
+ *
+ * De AI-tools (datum/tijd, zoeken, pagina's lezen, geheugen, database, status) staan in ai/ en worden
+ * hier door ai/Controller.php uitgevoerd. Zie ai/README.md.
  */
 declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
+
+require __DIR__ . '/ai/bootstrap.php';
+
+use Rv\Ai\Config;
+use Rv\Ai\Controller;
+use Rv\Ai\Db;
+use Rv\Ai\Log;
+use Rv\Ai\SafeFetch;
 
 const GUARD = "<?php http_response_code(404); exit; ?>\n";
 const MAX_BODY = 30 * 1024 * 1024;   // foto's en video-beelden
@@ -84,11 +95,27 @@ if ($action === 'cancel') {
     if (is_dir($jobs)) @touch($jobs . '/' . $id . '.cancel');
     out(['ok' => true]);
 }
-if ($action !== 'start') out(['ok' => false, 'error' => 'Onbekende actie.'], 400);
+
+// identiteit: een door de browser bewaard geheim token (er is geen accountsysteem); het model bepaalt dit nooit
+$cid = is_string($in['client_id'] ?? null) && preg_match('/^[a-f0-9]{32}$/', $in['client_id']) ? $in['client_id'] : null;
+$userId = $cid !== null ? substr(hash('sha256', 'rv-ai|' . $cid), 0, 32) : null;
+$convId = is_string($in['conversation_id'] ?? null) && Db::validId($in['conversation_id']) ? $in['conversation_id'] : null;
 
 $c = cfg($dir);
 $conf = $c['config'] ?? null;
-$baseUrl = is_array($conf) ? rtrim((string)($conf['baseUrl'] ?? ''), '/') : '';
+
+if ($action === 'forget' || $action === 'delete_conversation') {
+    if ($userId === null) out(['ok' => false, 'error' => 'Geen identiteit.'], 400);
+    if ($action === 'delete_conversation' && $convId === null) out(['ok' => false, 'error' => 'Ongeldig gesprek.'], 400);
+    try {
+        $db = is_file($dir . '/ai.sqlite') ? new Db($dir . '/ai.sqlite') : null;
+        if ($db) { $action === 'forget' ? $db->forget($userId) : $db->deleteConversation($userId, $convId); }
+    } catch (Throwable $e) { out(['ok' => false, 'error' => 'Verwijderen mislukt.'], 500); }
+    out(['ok' => true]);
+}
+if ($action !== 'start') out(['ok' => false, 'error' => 'Onbekende actie.'], 400);
+
+$baseUrl = rtrim((string)((new Config($dir, is_array($conf) ? $conf : []))->get('LM_STUDIO_BASE_URL', '')), '/');
 if ($baseUrl === '' || !preg_match('#^https?://#i', $baseUrl)) out(['ok' => false, 'error' => 'Geen gedeelde verbinding ingesteld.', 'fallback' => true], 400);
 if (!function_exists('curl_init')) out(['ok' => false, 'error' => 'PHP-curl ontbreekt op deze server.', 'fallback' => true], 501);
 
@@ -118,7 +145,7 @@ if ($running >= MAX_RUNNING_PER_IP) out(['ok' => false, 'error' => 'Er loopt al 
 if ($recent >= MAX_STARTS_PER_10MIN) out(['ok' => false, 'error' => 'Te veel verzoeken. Probeer het over een paar minuten opnieuw.'], 429);
 
 $id = bin2hex(random_bytes(12));
-$st = ['unreachable' => false, 'status' => 'running', 'content' => '', 'reasoning' => '', 'finish' => null, 'usage' => null, 'error' => null,
+$st = ['tools' => [], 'sources' => [], 'note' => null, 'unreachable' => false, 'status' => 'running', 'content' => '', 'reasoning' => '', 'finish' => null, 'usage' => null, 'error' => null,
        'started' => microtime(true), 'first' => null, 'ended' => null, 'updated' => $now, 'ip' => $ip];
 writeJob($jobs, $id, $st);
 
@@ -136,11 +163,6 @@ if (function_exists('fastcgi_finish_request')) {
     @flush();
 }
 
-$headers = ['Content-Type: application/json', 'Accept: text/event-stream'];
-$key = trim((string)($c['apiKey'] ?? ''));
-if ($key !== '') $headers[] = 'Authorization: Bearer ' . $key;
-
-$buf = ''; $errRaw = ''; $lastWrite = 0.0; $cancelFile = $jobs . '/' . $id . '.cancel';
 $flushJob = function (bool $force = false) use (&$st, $jobs, $id, &$lastWrite) {
     $t = microtime(true);
     if (!$force && $t - $lastWrite < 0.25) return;
@@ -148,65 +170,30 @@ $flushJob = function (bool $force = false) use (&$st, $jobs, $id, &$lastWrite) {
     writeJob($jobs, $id, $st);
     $lastWrite = $t;
 };
+$lastWrite = 0.0;
+$cancelFile = $jobs . '/' . $id . '.cancel';
 
-$ch = curl_init($baseUrl . '/chat/completions');
-curl_setopt_array($ch, [
-    CURLOPT_POST => true,
-    CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-    CURLOPT_HTTPHEADER => $headers,
-    CURLOPT_CONNECTTIMEOUT => 15,
-    CURLOPT_TIMEOUT => 0,
-    CURLOPT_LOW_SPEED_LIMIT => 1,
-    CURLOPT_LOW_SPEED_TIME => 600,
-    CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
-    CURLOPT_FOLLOWLOCATION => false,
-    CURLOPT_WRITEFUNCTION => function ($ch, string $chunk) use (&$buf, &$errRaw, &$st, $flushJob, $cancelFile) {
-        if (is_file($cancelFile)) return 0;
-        if ((int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE) >= 400) { if (strlen($errRaw) < 20000) $errRaw .= $chunk; return strlen($chunk); }
-        $buf .= $chunk;
-        while (($nl = strpos($buf, "\n")) !== false) {
-            $line = trim(substr($buf, 0, $nl));
-            $buf = substr($buf, $nl + 1);
-            if (strncmp($line, 'data:', 5) !== 0) continue;
-            $d = trim(substr($line, 5));
-            if ($d === '' || $d === '[DONE]') continue;
-            $j = json_decode($d, true);
-            if (!is_array($j)) continue;
-            if (isset($j['error'])) { $st['error'] = is_array($j['error']) ? (string)($j['error']['message'] ?? json_encode($j['error'])) : (string)$j['error']; continue; }
-            $choice = $j['choices'][0] ?? null;
-            if (is_array($choice)) {
-                $dl = $choice['delta'] ?? [];
-                $txt = (string)($dl['content'] ?? '');
-                $rs = (string)($dl['reasoning_content'] ?? $dl['reasoning'] ?? '');
-                if ($txt !== '' || $rs !== '') {
-                    if ($st['first'] === null) $st['first'] = microtime(true);
-                    $st['content'] .= $txt; $st['reasoning'] .= $rs;
-                }
-                if (!empty($choice['finish_reason'])) $st['finish'] = $choice['finish_reason'];
-            }
-            if (isset($j['usage']) && is_array($j['usage'])) $st['usage'] = $j['usage'];
-        }
-        $flushJob();
-        return strlen($chunk);
-    },
-]);
-$ok = curl_exec($ch);
-$code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-$cerr = curl_error($ch);
-curl_close($ch);
+// beheerder? (alleen voor uitgebreide statusinformatie)
+$isAdmin = is_array($c) && isset($c['hash']) && is_string($in['password'] ?? null) && $in['password'] !== '' && password_verify($in['password'], $c['hash']);
 
-$cancelled = is_file($cancelFile);
-if ($cancelled) {
-    @unlink($cancelFile);
-    $st['status'] = 'done';
-} elseif ($code >= 400) {
-    $m = $errRaw; $j = json_decode($errRaw, true);
-    if (is_array($j)) $m = is_array($j['error'] ?? null) ? (string)($j['error']['message'] ?? $errRaw) : (string)($j['error'] ?? $errRaw);
-    $st['status'] = 'error'; $st['error'] = "HTTP $code: " . mb_substr($m, 0, 500);
-} elseif ($ok === false && $st['content'] === '' && $st['reasoning'] === '') {
-    $st['status'] = 'error'; $st['unreachable'] = true; $st['error'] = 'Kan het model niet bereiken vanaf de server (' . $cerr . '). Is de Base URL publiek bereikbaar?';
-} else {
-    $st['status'] = $st['error'] ? 'error' : 'done';
+$cfgObj = new Config($dir, $conf ?? [], ['LM_STUDIO_API_KEY' => (string)($c['apiKey'] ?? '')]);
+$db = null;
+try {
+    if (extension_loaded('pdo_sqlite')) {
+        $db = new Db($cfgObj->get('AI_DB_PATH') ?: $dir . '/ai.sqlite');
+        $db->purgeOlderThan($cfgObj->int('AI_RETENTION_DAYS', 90, 1, 3650));
+    }
+} catch (Throwable $e) { $db = null; }
+$store = (bool)($conf['storeChats'] ?? true) && $db !== null;
+
+try {
+    $fetcher = new SafeFetch(null, $cfgObj->int('AI_WEB_TIMEOUT_SECONDS', 8, 2, 30), 1572864, $cfgObj->bool('AI_FETCH_ALLOW_HTTP', false));
+    (new Controller($cfgObj, $db, $fetcher, new Log($dir)))->run($body, $st, $flushJob, $cancelFile, [
+        'user_id' => $userId, 'conversation_id' => $convId, 'is_admin' => $isAdmin, 'store' => $store, 'rid' => $id,
+    ]);
+} catch (Throwable $e) {
+    $st['status'] = 'error';
+    $st['error'] = 'Interne fout bij het verwerken van dit antwoord.';
+    $st['ended'] = microtime(true);
+    $flushJob(true);
 }
-$st['ended'] = microtime(true);
-$flushJob(true);

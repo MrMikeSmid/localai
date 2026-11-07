@@ -150,6 +150,10 @@ canvas.orb{position:fixed;left:0;top:0;width:320px;height:320px;transform-origin
 @keyframes b{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
 .error{margin-top:8px;padding:12px 16px;border:1px solid var(--err);border-radius:14px;background:var(--errbg);color:var(--err);font-size:13px;line-height:1.6;white-space:pre-wrap}
 .note{margin-top:8px;font-size:12.5px;color:var(--muted)}
+.sources{margin:14px 0 0;display:flex;flex-direction:column;gap:2px;font-size:12.5px}
+.sources b{font-weight:500;color:var(--muted)}
+.sources a{color:var(--fg);text-decoration:underline;text-decoration-color:var(--clay);text-underline-offset:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toolsline{margin-top:8px;font-size:11.5px;color:var(--muted)}.toolsline .bad{color:var(--err)}
 
 /* invoer */
 .comp{padding-bottom:max(14px,env(safe-area-inset-bottom,0px))}
@@ -321,7 +325,7 @@ const LS={
 const DEFAULTS={
   baseUrl:'http://localhost:1234/v1',apiKey:'',model:'',system:'',
   temperature:'0.7',top_p:'',top_k:'',min_p:'',max_tokens:'',frequency_penalty:'',presence_penalty:'',repeat_penalty:'',seed:'',
-  stop:'',stream:true,serverRun:true,historyLimit:'',noThink:false,showThinking:true,enterToSend:true,extraBody:'',theme:'auto'
+  stop:'',stream:true,serverRun:true,toolMode:'router',storeChats:true,historyLimit:'',noThink:false,showThinking:true,enterToSend:true,extraBody:'',theme:'auto'
 };
 let S={...DEFAULTS,...LS.get('lai.settings',{})};
 let chats=LS.get('lai.chats',[]);
@@ -425,7 +429,9 @@ function aiBody(m){
     h+=`<details class="think"${open?' open':''}><summary>${p.thinking?'Denkt na…':'Redenering'}</summary><div>${esc(p.think)}</div></details>`;
   }
   if(p.answer)h+=md(p.answer);
-  else if(m._live&&!p.think)h+='<span class="dots"><i></i><i></i><i></i></span>';
+  else if(m._live&&!p.think)h+=(m._note?`<div class="note">${esc(m._note)}</div>`:'')+'<span class="dots"><i></i><i></i><i></i></span>';
+  if(m.sources&&m.sources.length)h+='<div class="sources"><b>Bronnen</b>'+m.sources.filter(s=>/^https?:\/\//i.test(s.url)).map((s,i)=>`<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${i+1}. ${esc(s.title||s.url)}</a>`).join('')+'</div>';
+  if(m.tools&&m.tools.length)h+='<div class="toolsline">'+m.tools.map(t=>`<span class="${t.ok?'':'bad'}" title="${esc(t.ok?(t.detail||''):(t.error||'mislukt'))}">${esc(t.name)} ${t.ok?'✓':'✗'}${t.ms?' '+(t.ms/1000).toFixed(1)+' s':''}</span>`).join(' · ')+'</div>';
   if(m.finish==='length')h+='<div class="note">Antwoord afgekapt: maximum aantal tokens bereikt. Verhoog "Max tokens" in de instellingen.</div>';
   if(m.interrupted)h+='<div class="note">Onderbroken: de pagina werd gesloten tijdens dit antwoord. Kies "Opnieuw genereren" om het te herhalen.</div>';
   if(m.error)h+=`<div class="error">${esc(m.error)}</div>`;
@@ -542,6 +548,13 @@ function setBusy(b){busy=b;$('#send').innerHTML=b?ic.stop:ic.up;$('#send').title
 function updSend(){$('#send').disabled=!busy&&(procN>0||(!inp.value.trim()&&!pending.length))}
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+/* anoniem browser-token: bepaalt welk serverGeheugen van jou is (er is geen accountsysteem) */
+const CID=(()=>{try{let v=localStorage.getItem('lai.cid');if(!/^[a-f0-9]{32}$/.test(v||'')){v=[...crypto.getRandomValues(new Uint8Array(16))].map(b=>b.toString(16).padStart(2,'0')).join('');localStorage.setItem('lai.cid',v)}return v}catch{return null}})();
+async function serverCall(body){
+  if(!shared.available||!CID)return false;
+  try{const r=await fetch('chat-run.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client_id:CID,...body})});const j=await r.json();return !!(j&&j.ok)}catch{return false}
+}
+const serverForget=()=>serverCall({action:'forget'});
 let serverOk=true;
 const useServer=()=>serverOk&&shared.available&&shared.configured&&S.serverRun!==false;
 function livePainter(c,m){
@@ -556,7 +569,7 @@ function livePainter(c,m){
   return {sched(){if(!raf)raf=requestAnimationFrame(paint)},stop(){if(raf)cancelAnimationFrame(raf);raf=0}};
 }
 function finishGen(c,m,stats){
-  delete m._live;delete m.job;delete m.running;
+  delete m._live;delete m.job;delete m.running;delete m._note;
   if(stats&&stats.tokens)m.stats=stats;
   if(!m.content&&!m.reasoning&&!m.error){const i=c.messages.indexOf(m);if(i>=0)c.messages.splice(i,1)}
   ctrl=null;c.updated=Date.now();saveC();
@@ -574,7 +587,7 @@ async function generate(){
 /* antwoord op de server laten lopen (chat-run.php) */
 async function runServer(c,m){
   try{
-    const res=await fetch('chat-run.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'start',body:buildBody(c)})});
+    const res=await fetch('chat-run.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'start',body:buildBody(c),client_id:CID,conversation_id:c.id,password:isAdmin?adminPw:undefined})});
     const r=await res.json().catch(()=>null);
     if(!res.ok||!r||!r.ok){
       if(!r||r.fallback||res.status===404||res.status===501){serverOk=false;return false}
@@ -607,7 +620,8 @@ async function followJob(c,m){
       }
       last=r;
       m.content=r.content||'';m.reasoning=r.reasoning||'';if(r.finish)m.finish=r.finish;
-      if(m.content||m.reasoning)P.sched();
+      m._note=r.note||'';if(r.tools&&r.tools.length)m.tools=r.tools;if(r.sources&&r.sources.length)m.sources=r.sources;
+      if(m.content||m.reasoning||m._note||(m.tools&&m.tools.length))P.sched();
       if(r.status!=='running'){
         if(r.status==='error'){
           if(r.unreachable&&!m.content&&!m.reasoning){fallback=true;serverOk=false}
@@ -778,7 +792,7 @@ $('#list').addEventListener('click',e=>{
   if(a==='del'){
     if(!confirm('Dit gesprek verwijderen?'))return;
     if(busy&&id===curId)ctrl&&ctrl.abort();
-    chats=chats.filter(c=>c.id!==id);if(curId===id)curId=null;saveC();renderThread();renderSide();return;
+    chats=chats.filter(c=>c.id!==id);if(curId===id)curId=null;saveC();renderThread();renderSide();serverCall({action:'delete_conversation',conversation_id:id});return;
   }
   if(a==='ren'){
     const c=chats.find(x=>x.id===id),t=prompt('Nieuwe naam:',c.title);
@@ -824,7 +838,7 @@ const NUM=[
 ];
 const num=(k,l,h,step)=>`<div class="fld"><label for="f_${k}">${l}</label><input type="number" id="f_${k}" data-k="${k}" step="${step}" placeholder="standaard" value="${esc(S[k])}"><div class="h">${h}</div></div>`;
 const chk=(k,t,d)=>`<label class="chk"><input type="checkbox" data-k="${k}"${S[k]?' checked':''}><span><b>${t}</b><small>${d}</small></span></label>`;
-const SHARED_KEYS=['baseUrl','model','system','temperature','top_p','top_k','min_p','max_tokens','frequency_penalty','presence_penalty','repeat_penalty','seed','stop','stream','serverRun','historyLimit','noThink','extraBody'];
+const SHARED_KEYS=['baseUrl','model','system','temperature','top_p','top_k','min_p','max_tokens','frequency_penalty','presence_penalty','repeat_penalty','seed','stop','stream','serverRun','toolMode','storeChats','historyLimit','noThink','extraBody'];
 let shared={available:false,configured:false},isAdmin=false,adminPw='';
 try{adminPw=sessionStorage.getItem('lai.pw')||''}catch{}
 const stash=v=>{try{v?sessionStorage.setItem('lai.pw',v):sessionStorage.removeItem('lai.pw')}catch{}};
@@ -872,6 +886,8 @@ function renderDrawer(){
   <h3>Gedrag</h3>
   ${chk('stream','Streamen','Toon het antwoord woord voor woord terwijl het binnenkomt.')}
   ${chk('serverRun','Antwoorden op de server laten doorlopen','Het antwoord loopt door als je de pagina sluit en staat klaar als je terugkomt. Werkt alleen met gedeelde instellingen en een Base URL die ook vanaf je webserver bereikbaar is (dus niet 192.168.x.x). Anders gaat het rechtstreeks vanuit de browser.')}
+  <div class="fld"><label for="f_toolMode">AI-tools (datum, zoeken, pagina's, geheugen, status)</label><select id="f_toolMode" data-k="toolMode"><option value="router">Router: de server beslist (aanbevolen voor kleine modellen)</option><option value="native">Native: het model kiest zelf tools</option><option value="off">Uit</option></select><div class="h">Tools draaien op de server en werken alleen als antwoorden op de server doorlopen (hierboven). Zoeken vraagt een zoekprovider in de serverconfiguratie, zie ai/README.md.</div></div>
+  ${chk('storeChats','Gesprekken op de server bewaren (geheugen)','Nodig voor "wat zei ik eerder?". Bezoekers kunnen hun serverdata zelf wissen; automatisch verwijderd na 90 dagen. Wachtwoorden en sleutels in berichten worden niet bewaard.')}
   ${chk('noThink','Denkmodus uitzetten (Qwen3)','Voegt <code>/no_think</code> toe aan het laatste bericht voor snellere antwoorden.')}
   <div class="fld"><label for="f_historyLimit">Max. berichten meesturen</label><input type="number" id="f_historyLimit" data-k="historyLimit" min="1" step="1" placeholder="alles" value="${esc(S.historyLimit)}"><div class="h">Beperk de context tot de laatste N berichten. Leeg = het hele gesprek.</div></div>
 
@@ -891,11 +907,12 @@ function renderDrawer(){
   <h3>Gegevens</h3>
   <div class="rowb">
     <button class="btn" id="exp">Alles exporteren</button><button class="btn" id="imp">Importeren</button>
-    <button class="btn danger" id="wipe">Alle gesprekken wissen</button>${locked()?'':'<button class="btn danger" id="reset">Standaardwaarden</button>'}
+    <button class="btn danger" id="wipe">Alle gesprekken wissen</button>${shared.available&&CID?'<button class="btn danger" id="srvwipe">Mijn serverdata wissen</button>':''}${locked()?'':'<button class="btn danger" id="reset">Standaardwaarden</button>'}
   </div>
   <p class="h" style="margin-top:12px;color:var(--mut);font-size:12.5px">Je gesprekken worden alleen in de localStorage van deze browser bewaard.</p>
   `+adminHTML();
   $('#f_theme').value=S.theme;
+  if($('#f_toolMode'))$('#f_toolMode').value=S.toolMode||'router';
   renderModelChips();
 }
 async function adminAction(kind){
@@ -950,7 +967,8 @@ $('#dBody').addEventListener('click',e=>{
   else if(b.id==='test')loadModels(true);
   else if(b.id==='exp')download('lokale-ai-gesprekken.json',JSON.stringify({version:1,exported:new Date().toISOString(),chats},null,1),'application/json');
   else if(b.id==='imp')$('#file').click();
-  else if(b.id==='wipe'){if(confirm('ALLE gesprekken definitief wissen?')){if(busy&&ctrl)ctrl.abort();chats=[];curId=null;saveC();renderThread();renderSide()}}
+  else if(b.id==='wipe'){if(confirm('ALLE gesprekken definitief wissen?')){if(busy&&ctrl)ctrl.abort();chats=[];curId=null;saveC();renderThread();renderSide();serverForget()}}
+  else if(b.id==='srvwipe'){if(confirm('Alles wissen wat de server van jouw gesprekken heeft bewaard (het geheugen)?')){serverForget().then(ok=>toast(ok?'Serverdata gewist.':'Wissen op de server is mislukt.'))}}
   else if(b.id==='reset'){if(confirm('Alle instellingen terugzetten naar standaard?')){S={...DEFAULTS};saveS();applyTheme();renderDrawer();renderChrome();loadModels(true)}}
 });
 function openDrawer(){renderDrawer();validateExtra();$('#drawer').classList.add('on');document.body.classList.add('drawer-open');scrim.classList.add('on');if(conn!=='ok')loadModels(false)}

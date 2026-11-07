@@ -26,7 +26,7 @@ const FIELDS = [
     'max_tokens' => ['n', 20], 'frequency_penalty' => ['n', 20], 'presence_penalty' => ['n', 20],
     'repeat_penalty' => ['n', 20], 'seed' => ['n', 20], 'historyLimit' => ['n', 20],
     'stop' => ['s', 2000], 'extraBody' => ['s', 20000],
-    'stream' => ['b', 0], 'noThink' => ['b', 0], 'serverRun' => ['b', 0],
+    'stream' => ['b', 0], 'noThink' => ['b', 0], 'serverRun' => ['b', 0], 'storeChats' => ['b', 0], 'toolMode' => ['s', 10],
 ];
 
 $dir  = __DIR__ . '/storage';
@@ -69,6 +69,7 @@ function clean(array $in): array {
         if ($t === 'n' && trim($v) !== '' && !is_numeric($v)) out(['ok' => false, 'error' => "$k moet een getal zijn."], 400);
         $c[$k] = $v;
     }
+    if (isset($c['toolMode']) && !in_array($c['toolMode'], ['router', 'native', 'off'], true)) out(['ok' => false, 'error' => 'toolMode moet router, native of off zijn.'], 400);
     if (!empty($c['extraBody']) && trim($c['extraBody']) !== '') {
         $x = json_decode($c['extraBody'], true);
         if (!is_array($x)) out(['ok' => false, 'error' => 'Extra JSON is geen geldig JSON-object.'], 400);
