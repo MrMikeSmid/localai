@@ -22,7 +22,14 @@ final class Config
     private const SHARED_MAP = [
         'LM_STUDIO_BASE_URL' => 'baseUrl',
         'LM_STUDIO_MODEL_ID' => 'model',
+        'LM_STUDIO_API_KEY' => 'apiKey',
         'AI_TOOL_MODE' => 'toolMode',
+    ];
+    /** Alternatieve namen (Ollama/gateway): AI_BASE_URL, AI_MODEL en AI_API_KEY werken hetzelfde. */
+    private const ALIASES = [
+        'LM_STUDIO_BASE_URL' => 'AI_BASE_URL',
+        'LM_STUDIO_MODEL_ID' => 'AI_MODEL',
+        'LM_STUDIO_API_KEY' => 'AI_API_KEY',
     ];
 
     public function __construct(string $storageDir, array $shared = [], array $overrides = [])
@@ -36,13 +43,24 @@ final class Config
         }
     }
 
+    /** Waarde uit overrides, omgevingsvariabelen of storage/ai-env.php (dus zonder de gedeelde instellingen uit de app). */
+    public function env(string $key): ?string
+    {
+        foreach (array_filter([$key, self::ALIASES[$key] ?? null]) as $k) {
+            if (isset($this->overrides[$k]) && $this->overrides[$k] !== '') return $this->overrides[$k];
+            $v = getenv($k);
+            if ($v !== false && $v !== '') return $v;
+            if (isset($_ENV[$k]) && $_ENV[$k] !== '') return (string)$_ENV[$k];
+            if (isset($this->file[$k]) && $this->file[$k] !== '') return $this->file[$k];
+        }
+        return null;
+    }
+
     public function get(string $key, ?string $default = null): ?string
     {
         if (isset($this->overrides[$key])) return $this->overrides[$key];
-        $v = getenv($key);
-        if ($v !== false && $v !== '') return $v;
-        if (isset($_ENV[$key]) && $_ENV[$key] !== '') return (string)$_ENV[$key];
-        if (isset($this->file[$key]) && $this->file[$key] !== '') return $this->file[$key];
+        $e = $this->env($key);
+        if ($e !== null) return $e;
         $s = self::SHARED_MAP[$key] ?? null;
         if ($s !== null && isset($this->shared[$s]) && $this->shared[$s] !== '') return (string)$this->shared[$s];
         return $default;

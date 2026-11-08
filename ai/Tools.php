@@ -257,20 +257,28 @@ final class Tools
         if (!in_array($detail, ['basic', 'full'], true)) throw new ToolError('invalid_arguments', 'detail moet basic of full zijn.');
         $admin = (bool)$this->ctx['is_admin'];
         $base = rtrim($this->cfg->get('LM_STUDIO_BASE_URL', '') ?? '', '/');
-        $reach = false; $loaded = null; $avail = null;
+        $reach = false; $loaded = null; $avail = null; $auth = [];
         if ($base !== '') {
-            $r = Http::get($base . '/models', [], 4, 0);
+            $key = trim((string)($this->cfg->get('LM_STUDIO_API_KEY') ?? ''));
+            $auth = $key !== '' ? ['Authorization: Bearer ' . $key] : [];
+            $r = Http::get($base . '/models', $auth, 4, 0);
             if ($r['error'] === null && $r['code'] >= 200 && $r['code'] < 300) {
                 $j = json_decode($r['body'], true);
                 if (is_array($j) && isset($j['data']) && is_array($j['data'])) {
                     $reach = true;
                     $avail = array_values(array_filter(array_map(static fn($m) => is_array($m) && isset($m['id']) ? (string)$m['id'] : null, $j['data'])));
-                    // LM Studio kent ook een eigen API die per model de status laat zien
+                    // Welke modellen zijn geladen? LM Studio: /api/v0/models; Ollama: /api/ps. Achter een gateway kan dit ontbreken: dan blijft het null.
                     $origin = preg_replace('#^(https?://[^/]+).*$#', '$1', $base);
-                    $r2 = Http::get($origin . '/api/v0/models', [], 4, 0);
-                    $j2 = $r2['error'] === null ? json_decode($r2['body'], true) : null;
+                    $r2 = Http::get($origin . '/api/v0/models', $auth, 4, 0);
+                    $j2 = ($r2['error'] === null && $r2['code'] === 200) ? json_decode($r2['body'], true) : null;
                     if (is_array($j2) && isset($j2['data']) && is_array($j2['data'])) {
                         $loaded = array_values(array_filter(array_map(static fn($m) => is_array($m) && ($m['state'] ?? '') === 'loaded' && isset($m['id']) ? (string)$m['id'] : null, $j2['data'])));
+                    } else {
+                        $r3 = Http::get($origin . '/api/ps', $auth, 4, 0);
+                        $j3 = ($r3['error'] === null && $r3['code'] === 200) ? json_decode($r3['body'], true) : null;
+                        if (is_array($j3) && isset($j3['models']) && is_array($j3['models'])) {
+                            $loaded = array_values(array_filter(array_map(static fn($m) => is_array($m) && isset($m['name']) ? (string)$m['name'] : null, $j3['models'])));
+                        }
                     }
                 }
             }

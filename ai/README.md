@@ -1,4 +1,4 @@
-# AI-tools voor de chat (Qwen3 via LM Studio)
+# AI-tools en modelserver voor de chat (Qwen3 via Ollama of LM Studio)
 
 De zes tools draaien in PHP op de server (`chat-run.php` → `ai/Controller.php`). Het model voert zelf nooit iets uit:
 alleen PHP zoekt, haalt pagina's op en leest gegevens. Een antwoord als "ik ga zoeken" telt niet als zoekactie.
@@ -56,6 +56,30 @@ Een klein model kan zich nog steeds laten misleiden in de **inhoud** van zijn an
 > ondersteunen, is hier niet getest (geen toegang tot jouw LM Studio). De native stand is getest tegen een nagebootste server die
 > `tool_calls` streamt. Test `native` zelf met echte vragen voordat je hem standaard maakt.
 
+## Modelserver: Ollama achter een https-gateway
+
+De chat spreekt een OpenAI-compatibele API aan (`POST /v1/chat/completions`, `GET /v1/models`). Dat werkt met Ollama, LM Studio en elke andere server met die API.
+Aanbevolen: laat alles via de PHP-backend lopen. Dan is er geen CORS en blijft de API-sleutel op de server.
+
+```dotenv
+AI_BASE_URL=https://rv-server.duckdns.org/v1
+AI_MODEL=qwen3:1.7b
+AI_API_KEY=<gateway-api-key>        # wordt als "Authorization: Bearer ..." meegestuurd
+```
+
+Zet dit als omgevingsvariabelen, of in `storage/ai-env.php` (zie hieronder). Omgevingsvariabelen gaan voor op wat een beheerder in de app heeft opgeslagen;
+de oude `LM_STUDIO_BASE_URL`, `LM_STUDIO_MODEL_ID` en `LM_STUDIO_API_KEY` blijven werken. Zonder deze variabelen kan de beheerder adres, model en sleutel in de app instellen
+(Instellingen, "Opslaan voor iedereen"); de sleutel gaat dan naar de server en wordt nooit teruggegeven.
+
+- **Modelnaam:** de exacte naam op de server, bij Ollama `qwen3:1.7b` (niet de LM Studio-naam `qwen/qwen3-1.7b`; zie `ollama list`). Een oude opgeslagen naam wordt overschreven zodra `AI_MODEL` is gezet.
+- **Test verbinding:** de knop laat de server `GET /v1/models` doen met de Bearer-sleutel (HTTP 200 = gelukt) en toont de beschikbare modellen en of het gekozen model bestaat.
+  De beheerder test hiermee ook ingevulde, nog niet opgeslagen waarden. Alleen als er nog geen serverkant is (nog niets opgeslagen en geen `AI_BASE_URL`) test de browser rechtstreeks (CORS nodig).
+- **Foutmeldingen** (zowel bij de test als in de chat): 401 (sleutel), 403, 404 (adres/`/v1` of model onbekend), 429, 502/503/504 (gateway/Ollama), time-out, DNS, https-/certificaatfout.
+- **Sleutel:** staat nooit in frontendcode, `localStorage` of logs. Een eerder in de browser bewaarde sleutel wordt bij het openen gewist. Een via de app opgeslagen sleutel staat in `storage/chat-config.php` (achter een PHP-guard, niet te downloaden);
+  voorkeur heeft `AI_API_KEY` als omgevingsvariabele.
+- **Ollama via `/v1`:** `top_k`, `min_p` en `repeat_penalty` worden genegeerd. Temperature, top_p, max tokens, seed, stopwoorden, streaming en `reasoning` van Qwen3 werken. "Denkmodus uitzetten" voegt `/no_think` toe.
+- **Status van de AI:** gebruikt `/v1/models` en, als de gateway het doorlaat, `/api/ps` (Ollama) of `/api/v0/models` (LM Studio) voor de geladen modellen; anders is dat `null`.
+
 ## Configuratie
 
 Omgevingsvariabelen hebben voorrang. Hosts zonder omgevingsvariabelen: maak `storage/ai-env.php` (wordt niet gedeployed of overschreven):
@@ -71,8 +95,9 @@ Omgevingsvariabelen hebben voorrang. Hosts zonder omgevingsvariabelen: maak `sto
 
 | Variabele | Standaard | Betekenis |
 |---|---|---|
-| `LM_STUDIO_BASE_URL` | gedeelde instelling "Base URL" | Moet vanaf de **webserver** bereikbaar zijn (tunnel), eindigend op `/v1`. |
-| `LM_STUDIO_MODEL_ID` | gedeelde instelling "Model", anders eerste niet-embedding-ID uit `/v1/models` | Exacte model-ID. |
+| `AI_BASE_URL` (of `LM_STUDIO_BASE_URL`) | gedeelde instelling "Base URL" | Moet vanaf de **webserver** bereikbaar zijn (https-gateway), eindigend op `/v1`. |
+| `AI_MODEL` (of `LM_STUDIO_MODEL_ID`) | gedeelde instelling "Model", anders eerste niet-embedding-ID uit `/v1/models` | Exacte model-ID, bij Ollama `qwen3:1.7b`. |
+| `AI_API_KEY` (of `LM_STUDIO_API_KEY`) | sleutel die de beheerder in de app opsloeg | Bearer-sleutel voor de gateway; alleen server-side. |
 | `AI_TIMEZONE` | `Europe/Amsterdam` | Tijdzone van de serverklok. |
 | `SEARCH_PROVIDER`, `BRAVE_SEARCH_API_KEY`, `SEARXNG_BASE_URL` | – | Zonder deze: `web_search` meldt eerlijk dat zoeken niet beschikbaar is. |
 | `AI_TOOL_MODE` | `router` | `router`, `native` of `off`. |
@@ -91,10 +116,10 @@ Een externe PHP-host kan de mini-pc niet uitlezen. Draai op de mini-pc een klein
 `Authorization: Bearer <token>` dit JSON teruggeeft: `{"cpu_usage_percent":12.5,"memory_used_mb":4096,"memory_total_mb":16384}`.
 Zonder agent geeft `get_system_status` voor deze waarden `null` (nooit geschatte cijfers). De agent zelf is **niet** meegeleverd.
 
-### LM Studio-endpoint beveiligen
+### Modelserver beveiligen
 
-Een publiek bereikbare LM Studio-tunnel moet authenticatie hebben (LM Studio: "Require Authentication"; de sleutel stel je als beheerder
-in en blijft op de server) plus rate limiting en logging aan de tunnelkant. `chat-run.php` begrenst alleen per IP.
+Een publiek bereikbare modelserver moet authenticatie hebben (gateway met Bearer-sleutel, of LM Studio: "Require Authentication"; de sleutel stel je in via `AI_API_KEY` of als beheerder
+in de app en blijft op de server) plus rate limiting en logging aan de tunnelkant. `chat-run.php` begrenst alleen per IP.
 
 ## Opslag, privacy en verwijdering
 
@@ -106,8 +131,8 @@ Het log (`storage/ai-log.jsonl`) bevat alleen toolnaam, duur, succes, foutcode e
 
 ## Tests
 
-`php tests/run.php` start een lokale testserver (nagebootste LM Studio, zoekdiensten en website) en draait de tests voor happy paths, fouten,
+`php tests/run.php` start een lokale testserver (nagebootste Ollama-gateway met Bearer, zoekdiensten en website) en draait de tests voor happy paths, fouten,
 autorisatie en SSRF. Er wordt niets via internet opgehaald. `tests/` wordt niet gedeployed.
 
-Niet gedekt: een echte Brave-/SearXNG-aanroep, een echte LM Studio met Qwen3-1.7B en een live `fetch_page` naar een openbare site (zonder internet in de testomgeving).
+Niet gedekt: een echte Brave-/SearXNG-aanroep, de echte gateway `rv-server.duckdns.org` met Ollama en Qwen3-1.7B en een live `fetch_page` naar een openbare site (zonder internet in de testomgeving).
 Voer die handmatig uit na de configuratie.

@@ -4,7 +4,7 @@ namespace Rv\Ai;
 defined('RV_AI') or exit;
 
 /**
- * Centrale AI-controller: bouwt de prompt (met serverklok), voert tools uit in PHP en laat LM Studio
+ * Centrale AI-controller: bouwt de prompt (met serverklok), voert tools uit in PHP en laat de modelserver (Ollama/LM Studio)
  * het definitieve antwoord streamen naar de jobstatus. Twee standen:
  *  - router (standaard): PHP beslist op basis van de vraag welke tools lopen en geeft de echte resultaten
  *    als context mee. Dit werkt ook met modellen waarbij tool calling instabiel is.
@@ -19,6 +19,7 @@ final class Controller
     private Log $log;
     /** @var callable|null */
     private $clock;
+    private string $apiKey = '';
 
     private const RULES = <<<'TXT'
 Regels:
@@ -53,6 +54,7 @@ TXT;
 
         $headers = ['Content-Type: application/json', 'Accept: text/event-stream'];
         $key = trim((string)($this->cfg->get('LM_STUDIO_API_KEY') ?? ''));
+        $this->apiKey = $key;
         if ($key !== '') $headers[] = 'Authorization: Bearer ' . $key;
 
         // berichten van de client opschonen: geen tool-berichten of tool_calls van buiten
@@ -80,8 +82,8 @@ TXT;
         $model = $this->cfg->get('LM_STUDIO_MODEL_ID');
         if (!$model && isset($body['model']) && is_string($body['model'])) $model = $body['model'];
         if (!$model) {
-            $r = Http::get($base . '/models', [], 4, 0);
-            $j = $r['error'] === null ? json_decode($r['body'], true) : null;
+            $r = Http::get($base . '/models', $key !== '' ? ['Authorization: Bearer ' . $key] : [], 6, 0);
+            $j = ($r['error'] === null && $r['code'] === 200) ? json_decode($r['body'], true) : null;
             foreach (($j['data'] ?? []) as $m) if (isset($m['id']) && stripos((string)$m['id'], 'embed') === false) { $model = (string)$m['id']; break; }
         }
 
@@ -269,7 +271,7 @@ TXT;
         return $out;
     }
 
-    /* ------------------------------------------------------------------ streaming naar LM Studio */
+    /* ------------------------------------------------------------------ streaming naar de modelserver */
 
     /**
      * Roept /chat/completions aan en streamt. Bij $buffer=true wordt niets naar de jobstatus geschreven
@@ -336,10 +338,11 @@ TXT;
         $ok = curl_exec($ch);
         $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         $cerr = curl_error($ch);
+        $errno = curl_errno($ch);
         curl_close($ch);
         ksort($calls);
         foreach ($calls as $i => $c) { if ($c['id'] === '') $calls[$i]['id'] = 'call' . $i; }
-        return ['code' => $code, 'ok' => $ok !== false, 'cerr' => $cerr, 'errRaw' => $errRaw, 'cancelled' => is_file($cancelFile), 'tool_calls' => array_values($calls),
+        return ['code' => $code, 'ok' => $ok !== false, 'cerr' => $cerr, 'errno' => $errno, 'errRaw' => $errRaw, 'cancelled' => is_file($cancelFile), 'tool_calls' => array_values($calls),
                 'content_buf' => $cbuf, 'reasoning_buf' => $rbuf, 'usage' => $usage, 'first' => $first, 'got' => $got];
     }
 
@@ -351,12 +354,14 @@ TXT;
             @unlink($cancelFile);
             $st['status'] = 'done';
         } elseif (($r['code'] ?? 0) >= 400) {
-            $m = (string)($r['errRaw'] ?? ''); $j = json_decode($m, true);
-            if (is_array($j)) $m = is_array($j['error'] ?? null) ? (string)($j['error']['message'] ?? $m) : (string)($j['error'] ?? $m);
-            $st['status'] = 'error'; $st['error'] = 'HTTP ' . $r['code'] . ': ' . mb_substr($m, 0, 500);
+            [$c, $msg] = Gateway::describe((int)$r['code'], Gateway::scrub(Gateway::errorDetail((string)($r['errRaw'] ?? '')), $this->apiKey));
+            $st['status'] = 'error'; $st['error'] = $msg; $st['error_code'] = $c;
         } elseif (empty($r['ok']) && $st['content'] === '' && $st['reasoning'] === '' && empty($r['got'])) {
-            $st['status'] = 'error'; $st['unreachable'] = true;
-            $st['error'] = 'Kan het model niet bereiken vanaf de server (' . ($r['cerr'] ?? '') . '). Is de Base URL publiek bereikbaar?';
+            [$c, $msg] = Gateway::describeNetwork((int)($r['errno'] ?? 0), 0);
+            if (($r['errno'] ?? 0) === 28) $msg = 'Time-out: de server reageerde niet op tijd.';
+            $st['status'] = 'error'; $st['error_code'] = $c;
+            $st['unreachable'] = in_array($c, ['dns', 'connect', 'timeout', 'network'], true);
+            $st['error'] = $msg;
         } else {
             $st['status'] = $st['error'] ? 'error' : 'done';
         }

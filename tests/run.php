@@ -8,7 +8,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../ai/bootstrap.php';
 
-use Rv\Ai\{Config, Controller, Db, HtmlText, Log, Router, SafeFetch, Ssrf, ToolError, Tools};
+use Rv\Ai\{Config, Controller, Db, Gateway, HtmlText, Log, Router, SafeFetch, Ssrf, ToolError, Tools};
 
 putenv('NO_PROXY=*'); putenv('no_proxy=*'); putenv('HTTP_PROXY'); putenv('http_proxy'); putenv('HTTPS_PROXY'); putenv('https_proxy');
 
@@ -369,9 +369,9 @@ t('native: geen relevante tool -> geen tools aangeboden', function () use ($run,
 t('toolmodus off: geen tools, wel klok', function () use ($run, $lmReq) {
     $st = $run('Zoek het laatste nieuws over Qwen', ['AI_TOOL_MODE' => 'off']); eq($st['tools'], []); $u = end($lmReq()[0]['messages'])['content']; hasNot($u, 'tool_result');
 });
-t('LM Studio onbereikbaar: duidelijke fout', function () use ($run) {
+t('modelserver onbereikbaar: duidelijke fout', function () use ($run) {
     $st = $run('Hallo', ['LM_STUDIO_BASE_URL' => 'http://127.0.0.1:1/v1']);
-    eq($st['status'], 'error'); eq($st['unreachable'], true); has($st['error'], 'niet bereiken');
+    eq($st['status'], 'error'); eq($st['unreachable'], true); has($st['error'], 'Geen verbinding');
 });
 
 echo "\nGeheimen en configuratie\n";
@@ -382,6 +382,125 @@ t('API-sleutels komen niet in logs en config leest env/bestand', function () use
     $c = new Config($tmp, [], []); eq($c->get('SEARCH_PROVIDER'), 'brave'); eq($c->int('AI_MAX_TOOL_ROUNDS', 3), 2);
     putenv('AI_MAX_TOOL_ROUNDS=5'); eq((new Config($tmp, [], []))->int('AI_MAX_TOOL_ROUNDS', 3), 5, 'omgevingsvariabele wint van bestand'); putenv('AI_MAX_TOOL_ROUNDS');
     unlink($tmp . '/ai-env.php');
+});
+
+
+echo "\nOllama-gateway: configuratie\n";
+t('AI_BASE_URL, AI_MODEL en AI_API_KEY werken als LM_STUDIO-namen; omgevingsvariabele wint van opgeslagen instelling', function () use ($tmp) {
+    $shared = ['baseUrl' => 'http://oud:1234/v1', 'model' => 'qwen/qwen3-1.7b', 'apiKey' => 'opgeslagen'];
+    $c = new Config($tmp, $shared, []);
+    eq($c->get('LM_STUDIO_BASE_URL'), 'http://oud:1234/v1'); eq($c->get('LM_STUDIO_MODEL_ID'), 'qwen/qwen3-1.7b'); eq($c->get('LM_STUDIO_API_KEY'), 'opgeslagen');
+    eq($c->env('LM_STUDIO_BASE_URL'), null, 'env() negeert de gedeelde instellingen');
+    $c = new Config($tmp, $shared, ['AI_BASE_URL' => 'https://rv-server.duckdns.org/v1', 'AI_MODEL' => 'qwen3:1.7b', 'AI_API_KEY' => 'geheim']);
+    eq($c->get('LM_STUDIO_BASE_URL'), 'https://rv-server.duckdns.org/v1'); eq($c->get('LM_STUDIO_MODEL_ID'), 'qwen3:1.7b'); eq($c->get('LM_STUDIO_API_KEY'), 'geheim');
+    putenv('AI_MODEL=qwen3:1.7b'); eq((new Config($tmp, $shared, []))->get('LM_STUDIO_MODEL_ID'), 'qwen3:1.7b', 'echte omgevingsvariabele'); putenv('AI_MODEL');
+});
+
+echo "\nOllama-gateway: verbindingstest en foutmeldingen\n";
+$gwBase = "$base/gw/v1";
+t('GET /v1/models met Bearer: HTTP 200 en modellen, model qwen3:1.7b herkend', function () use ($gwBase) {
+    $r = Gateway::test($gwBase, 'gwkey', 'qwen3:1.7b', 5);
+    ok($r['ok'], json_encode($r)); eq($r['status'], 200); eq($r['models'], ['qwen3:1.7b']); eq($r['model_found'], true); eq($r['error'], null);
+    eq(Gateway::test($gwBase, 'gwkey', 'qwen/qwen3-1.7b', 5)['model_found'], false, 'oude LM Studio-naam wordt niet herkend');
+});
+t('401: ontbrekende of onjuiste sleutel', function () use ($gwBase) {
+    foreach (['', 'fout'] as $k) { $r = Gateway::test($gwBase, $k, '', 5); eq($r['ok'], false); eq($r['status'], 401); eq($r['error']['code'], 'unauthorized'); has($r['error']['message'], 'API-sleutel'); }
+});
+t('404, 429, 502, 503, 504 en 500 geven duidelijke meldingen', function () use ($base) {
+    $exp = [404 => ['not_found', '/v1'], 429 => ['rate_limited', 'Te veel verzoeken'], 502 => ['bad_gateway', 'Ollama'], 503 => ['unavailable', 'tijdelijk'], 504 => ['gateway_timeout', 'te laat'], 500 => ['server_error', 'HTTP 500']];
+    foreach ($exp as $code => [$c, $txt]) { $r = Gateway::test("$base/status/$code/v1", 'k', '', 5); eq($r['error']['code'], $c, "HTTP $code"); has($r['error']['message'], $txt); eq($r['status'], $code); }
+});
+t('time-out, geweigerde verbinding, ongeldig adres en geen JSON', function () use ($base) {
+    $r = Gateway::test("$base/slow/v1", '', '', 1); eq($r['error']['code'], 'timeout'); has($r['error']['message'], 'Time-out');
+    eq(Gateway::test('http://127.0.0.1:1/v1', '', '', 2)['error']['code'], 'connect');
+    eq(Gateway::test('rv-server.duckdns.org/v1', '', '', 2)['error']['code'], 'invalid_url');
+    eq(Gateway::test("$base/html/v1", '', '', 3)['error']['code'], 'bad_response');
+});
+t('de API-sleutel komt nooit in een melding terecht', function () use ($base) {
+    $r = Gateway::test("$base/echo/v1", 'gwkey-GEHEIM-123', '', 5);
+    eq($r['error']['code'], 'server_error'); hasNot(json_encode($r), 'GEHEIM-123');
+});
+t('vertaling van HTTP-statussen (ook model niet gevonden)', function () {
+    eq(Gateway::describe(401)[0], 'unauthorized'); eq(Gateway::describe(403)[0], 'forbidden'); eq(Gateway::describe(404)[0], 'not_found');
+    $m = Gateway::describe(404, 'model "qwen/qwen3-1.7b" not found, try pulling it first'); eq($m[0], 'model_not_found'); has($m[1], "qwen/qwen3-1.7b"); has($m[1], 'ollama list');
+    eq(Gateway::describe(418)[0], 'http_error'); eq(Gateway::describeNetwork(28, 8)[0], 'timeout'); eq(Gateway::describeNetwork(60, 8)[0], 'tls'); eq(Gateway::describeNetwork(6, 8)[0], 'dns');
+});
+
+t('get_system_status: geladen modellen via Ollama (/api/ps) en Bearer-sleutel', function () use ($mk, $port) {
+    $x = $mk(['LM_STUDIO_BASE_URL' => "http://localhost:$port/v1", 'LM_STUDIO_API_KEY' => 'k'], null, ['is_admin' => true]);
+    $r = $x->run('get_system_status', ['detail' => 'full']);
+    ok($r['success']); eq($r['lm_studio']['reachable'], true); eq($r['lm_studio']['loaded_models'], ['qwen3:1.7b']);
+    $g = $mk(['LM_STUDIO_BASE_URL' => "$GLOBALS[base]/gw/v1", 'LM_STUDIO_API_KEY' => 'gwkey'], null, ['is_admin' => false])->run('get_system_status', []);
+    eq($g['lm_studio']['reachable'], true, 'status gebruikt de Bearer-sleutel');
+    $n = $mk(['LM_STUDIO_BASE_URL' => "$GLOBALS[base]/gw/v1"], null, ['is_admin' => false])->run('get_system_status', []);
+    eq($n['lm_studio']['reachable'], false, 'zonder sleutel: niet bereikbaar volgens de gateway');
+});
+
+echo "\nOllama-gateway: via de PHP-backend (chat-config.php en chat-run.php)\n";
+$site = $tmp . '/site'; mkdir($site, 0755, true); mkdir($site . '/ai', 0755, true);
+foreach (['chat-run.php', 'chat-config.php'] as $f) copy(__DIR__ . '/../' . $f, "$site/$f");
+foreach (glob(__DIR__ . '/../ai/*') as $f) { if (is_file($f)) copy($f, $site . '/ai/' . basename($f)); }
+mkdir($site . '/ai/migrations', 0755, true); foreach (glob(__DIR__ . '/../ai/migrations/*') as $f) copy($f, $site . '/ai/migrations/' . basename($f));
+$startSite = function (array $env) use ($site) {
+    $sock = stream_socket_server('tcp://127.0.0.1:0', $en, $es); $p = (int)substr(strrchr(stream_socket_get_name($sock, false), ':'), 1); fclose($sock);
+    @mkdir($site . '/storage-' . $p); 
+    $pr = proc_open([PHP_BINARY, '-S', "127.0.0.1:$p", '-t', $site], [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, $site, $env + ['PHP_CLI_SERVER_WORKERS' => '4', 'PATH' => getenv('PATH')]);
+    for ($i = 0; $i < 50; $i++) { $f = @fsockopen('127.0.0.1', $p, $e1, $e2, 0.2); if ($f) { fclose($f); break; } usleep(100000); }
+    return [$pr, "http://127.0.0.1:$p"];
+};
+$post = function (string $url, array $data): array {
+    $ch = curl_init($url); curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => json_encode($data), CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => ['Content-Type: application/json'], CURLOPT_TIMEOUT => 15, CURLOPT_PROXY => '']);
+    $raw = (string)curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE); curl_close($ch);
+    return ['code' => $code, 'raw' => $raw, 'json' => json_decode($raw, true)];
+};
+$getJson = function (string $url): array { $ch = curl_init($url); curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_PROXY => '']); $raw = (string)curl_exec($ch); curl_close($ch); return ['raw' => $raw, 'json' => json_decode($raw, true)]; };
+$runJob = function (string $site, string $model = 'qwen/qwen3-1.7b') use ($post, $getJson): array {
+    $r = $post("$site/chat-run.php", ['action' => 'start', 'body' => ['model' => $model, 'messages' => [['role' => 'system', 'content' => 'Wees kort.'], ['role' => 'user', 'content' => 'Hallo']]], 'client_id' => str_repeat('a', 32), 'conversation_id' => 'c-1']);
+    if (empty($r['json']['ok'])) return ['start' => $r];
+    for ($i = 0; $i < 60; $i++) { usleep(150000); $j = $getJson("$site/chat-run.php?id=" . $r['json']['id'])['json']; if (($j['status'] ?? 'running') !== 'running') return ['job' => $j, 'raw' => $j]; }
+    return ['job' => ['status' => 'timeout']];
+};
+$srvEnv = ['AI_BASE_URL' => "$base/gw/v1", 'AI_MODEL' => 'qwen3:1.7b', 'AI_API_KEY' => 'gwkey'];
+[$p1, $s1] = $startSite($srvEnv);
+register_shutdown_function(fn() => proc_terminate($p1));
+t('chat-config.php meldt alleen DAT de server de verbinding beheert, nooit adres of sleutel', function () use ($getJson, $s1, $base) {
+    $r = $getJson("$s1/chat-config.php"); $j = $r['json'];
+    eq($j['managed']['base'], true); eq($j['managed']['model'], 'qwen3:1.7b'); eq($j['managed']['key'], true); eq($j['server_key'], true);
+    hasNot($r['raw'], 'gwkey'); hasNot($r['raw'], $base);
+});
+t('verbindingstest via de backend: 200, modellen, geen sleutel in het antwoord', function () use ($post, $s1, $base) {
+    $r = $post("$s1/chat-run.php", ['action' => 'test']); $j = $r['json'];
+    ok($j['ok'] && $j['result']['ok'], $r['raw']); eq($j['result']['status'], 200); eq($j['result']['models'], ['qwen3:1.7b']); eq($j['result']['model_found'], true);
+    hasNot($r['raw'], 'gwkey'); hasNot($r['raw'], $base);
+});
+t('niet-beheerders kunnen geen eigen adres of sleutel laten testen', function () use ($post, $s1) {
+    $r = $post("$s1/chat-run.php", ['action' => 'test', 'base_url' => 'http://127.0.0.1:1/v1', 'api_key' => 'x', 'model' => 'x']); $j = $r['json'];
+    ok($j['result']['ok'], 'de opgeslagen/omgevingsconfiguratie wordt getest, niet het ingevulde adres'); eq($j['result']['model_found'], true);
+});
+t('chat via de backend: Bearer naar de gateway, ingesteld model wint van de oude LM Studio-naam', function () use ($runJob, $s1, $mockLog) {
+    @unlink($mockLog); @unlink($mockLog . '.auth');
+    $r = $runJob($s1, 'qwen/qwen3-1.7b'); $j = $r['job'] ?? [];
+    eq($j['status'] ?? '', 'done', json_encode($r)); eq($j['content'], 'Dit is het antwoord.'); eq($j['error'], null);
+    $auth = array_filter(explode("\n", (string)file_get_contents($mockLog . '.auth'))); ok($auth && count(array_unique($auth)) === 1 && $auth[0] === 'Bearer gwkey', 'Bearer-sleutel meegestuurd: ' . json_encode($auth));
+    $req = json_decode(trim((string)file_get_contents($mockLog)), true); eq($req['model'], 'qwen3:1.7b');
+    hasNot(json_encode($j), 'gwkey');
+});
+[$p2, $s2] = $startSite(['AI_BASE_URL' => "$base/gw/v1", 'AI_MODEL' => 'qwen3:1.7b']);
+register_shutdown_function(fn() => proc_terminate($p2));
+t('zonder sleutel: duidelijke 401-melding bij chat en test', function () use ($runJob, $post, $s2) {
+    $j = $runJob($s2)['job']; eq($j['status'], 'error'); has($j['error'], 'HTTP 401'); has($j['error'], 'API-sleutel');
+    $t = $post("$s2/chat-run.php", ['action' => 'test'])['json']; eq($t['result']['error']['code'], 'unauthorized');
+});
+[$p3, $s3] = $startSite(['AI_BASE_URL' => "$base/gw/v1", 'AI_MODEL' => 'qwen/qwen3-1.7b', 'AI_API_KEY' => 'gwkey']);
+register_shutdown_function(fn() => proc_terminate($p3));
+t('oude modelnaam op de server: melding dat het model niet bestaat (404)', function () use ($runJob, $post, $s3) {
+    $j = $runJob($s3)['job']; eq($j['status'], 'error'); has($j['error'], "bestaat niet op de server"); has($j['error'], 'ollama list');
+    $t = $post("$s3/chat-run.php", ['action' => 'test'])['json']['result']; ok($t['ok']); eq($t['model_found'], false);
+});
+[$p4, $s4] = $startSite(['AI_BASE_URL' => "http://127.0.0.1:1/v1", 'AI_API_KEY' => 'gwkey']);
+register_shutdown_function(fn() => proc_terminate($p4));
+t('server kan de gateway niet bereiken: melding en terugvalvlag', function () use ($runJob, $s4) {
+    $j = $runJob($s4)['job']; eq($j['status'], 'error'); eq($j['unreachable'], true); has($j['error'], 'verbinding');
 });
 
 echo "\n" . ($failed ? count($failed) . " mislukt, $pass geslaagd\n" : "alle $pass tests geslaagd\n");

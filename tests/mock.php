@@ -5,13 +5,30 @@ $log = getenv('MOCK_LOG') ?: sys_get_temp_dir() . '/rv-mock.log';
 $port = (int)$_SERVER['SERVER_PORT'];
 function j($d, int $c = 200) { http_response_code($c); header('Content-Type: application/json'); echo json_encode($d); exit; }
 
-if ($path === '/v1/models') j(['data' => [['id' => 'qwen3-1.7b'], ['id' => 'text-embedding-x']]]);
+// Ollama-gateway met Bearer-authenticatie (/gw/v1/...), foutcodes (/status/NNN/...), traag (/slow/...), HTML-antwoord en sleutel-echo
+$gw = false;
+if (preg_match('#^/gw(/.*)$#', $path, $m)) {
+    $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    file_put_contents($log . '.auth', $auth . "\n", FILE_APPEND);
+    if ($auth !== 'Bearer gwkey') j(['error' => ['message' => 'Unauthorized']], 401);
+    $path = $m[1]; $gw = true;
+}
+if (preg_match('#^/status/(\d{3})(/.*)$#', $path, $m)) j(['error' => ['message' => 'status ' . $m[1]]], (int)$m[1]);
+if (preg_match('#^/slow(/.*)$#', $path, $m)) { sleep(3); $path = $m[1]; }
+if ($path === '/html/v1/models') { header('Content-Type: text/html'); echo '<html><body>Inloggen</body></html>'; exit; }
+if ($path === '/echo/v1/models') j(['error' => ['message' => 'bad token ' . ($_SERVER['HTTP_AUTHORIZATION'] ?? '')]], 500);
+
+if ($path === '/v1/models') j($gw ? ['data' => [['id' => 'qwen3:1.7b']]] : ['data' => [['id' => 'qwen3-1.7b'], ['id' => 'text-embedding-x']]]);
+$ollama = strpos($_SERVER['HTTP_HOST'] ?? '', 'localhost') === 0;   // aanroepen via 'localhost' gedragen zich als Ollama
+if ($path === '/api/ps') j(['models' => [['name' => 'qwen3:1.7b', 'model' => 'qwen3:1.7b']]]);
+if ($path === '/api/v0/models' && $ollama) j(['error' => 'not found'], 404);
 if ($path === '/api/v0/models') j(['data' => [['id' => 'qwen3-1.7b', 'state' => 'loaded'], ['id' => 'text-embedding-x', 'state' => 'not-loaded']]]);
 
 if ($path === '/v1/chat/completions') {
     $raw = file_get_contents('php://input');
     file_put_contents($log, $raw . "\n", FILE_APPEND);
     $b = json_decode($raw, true);
+    if ($gw && ($b['model'] ?? '') !== 'qwen3:1.7b') j(['error' => ['message' => 'model "' . ($b['model'] ?? '') . '" not found, try pulling it first']], 404);
     $msgs = $b['messages'];
     $last = end($msgs);
     $lastUser = '';

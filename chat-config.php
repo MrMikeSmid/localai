@@ -12,6 +12,9 @@
  */
 declare(strict_types=1);
 
+require __DIR__ . '/ai/bootstrap.php';
+use Rv\Ai\Config;
+
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
@@ -79,6 +82,7 @@ function clean(array $in): array {
 
 // Optionele API-sleutel voor chat-run.php; wordt alleen op de server bewaard en nooit teruggegeven.
 function apiKey(array $in, string $old): string {
+    if (($in['clear_api_key'] ?? false) === true) return '';
     $k = $in['apiKey'] ?? null;
     return is_string($k) && trim($k) !== '' && strlen($k) <= 500 ? trim($k) : $old;
 }
@@ -86,7 +90,11 @@ function apiKey(array $in, string $old): string {
 $stored = load($file);
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    out(['ok' => true, 'configured' => $stored !== null, 'config' => $stored['config'] ?? new stdClass()]);
+    // Wat de server zelf regelt (omgevingsvariabelen). Er worden nooit sleutels of adressen teruggegeven, alleen of ze er zijn.
+    $env = new Config($dir);
+    out(['ok' => true, 'configured' => $stored !== null, 'config' => $stored['config'] ?? new stdClass(),
+         'managed' => ['base' => $env->env('LM_STUDIO_BASE_URL') !== null, 'model' => $env->env('LM_STUDIO_MODEL_ID'), 'key' => $env->env('LM_STUDIO_API_KEY') !== null],
+         'server_key' => $env->env('LM_STUDIO_API_KEY') !== null || trim((string)($stored['apiKey'] ?? '')) !== '']);
 }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') out(['ok' => false, 'error' => 'Methode niet toegestaan.'], 405);
 
