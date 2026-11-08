@@ -2,7 +2,8 @@
 /**
  * Antwoorden op de server laten doorlopen, ook als de pagina wordt gesloten.
  *
- * POST {action:'start', body:{...chat/completions...}} -> {ok, id}
+ * POST {action:'test'}                                  -> {ok, result:{ok,status,models,model_found,error}}
+POST {action:'start', body:{...chat/completions...}} -> {ok, id}
  *      De server vraagt het antwoord aan het model (Base URL uit de gedeelde instellingen,
  *      nooit uit het verzoek) en schrijft de tekst telkens weg in storage/jobs/<id>.php.
  * GET  ?id=<id>                                         -> {ok, status, content, reasoning, ...}
@@ -25,6 +26,7 @@ require __DIR__ . '/ai/bootstrap.php';
 use Rv\Ai\Config;
 use Rv\Ai\Controller;
 use Rv\Ai\Db;
+use Rv\Ai\Gateway;
 use Rv\Ai\Log;
 use Rv\Ai\SafeFetch;
 
@@ -103,6 +105,29 @@ $convId = is_string($in['conversation_id'] ?? null) && Db::validId($in['conversa
 
 $c = cfg($dir);
 $conf = $c['config'] ?? null;
+// Verbinding: omgevingsvariabelen (AI_BASE_URL, AI_MODEL, AI_API_KEY) gaan voor op de gedeelde instellingen. De sleutel blijft op de server.
+$cfgObj = new Config($dir, array_merge(is_array($conf) ? $conf : [], ['apiKey' => (string)($c['apiKey'] ?? '')]));
+// beheerder? (alleen daarmee mogen niet-opgeslagen waarden worden getest en krijgt de status meer details)
+$isAdmin = is_array($c) && isset($c['hash']) && is_string($in['password'] ?? null) && $in['password'] !== '' && password_verify($in['password'], $c['hash']);
+
+if ($action === 'test') {
+    // Verbindingstest vanaf de server (GET /v1/models met Bearer): geen CORS en de sleutel komt nooit in de browser.
+    $tip = sha1($_SERVER['REMOTE_ADDR'] ?? '');
+    try {
+        if (extension_loaded('pdo_sqlite') && !(new Db($dir . '/ai.sqlite'))->rateHit('conntest:' . $tip, 15, 60)) out(['ok' => false, 'error' => 'Te veel tests. Probeer het over een minuut opnieuw.'], 429);
+    } catch (Throwable $e) { /* zonder rate limit doorgaan */ }
+    if (!function_exists('curl_init')) out(['ok' => false, 'error' => 'PHP-curl ontbreekt op deze server.', 'fallback' => true], 501);
+    $tBase = (string)$cfgObj->get('LM_STUDIO_BASE_URL', '');
+    $tKey = (string)$cfgObj->get('LM_STUDIO_API_KEY', '');
+    $tModel = (string)$cfgObj->get('LM_STUDIO_MODEL_ID', '');
+    if ($isAdmin) {   // de beheerder test de ingevulde, nog niet opgeslagen waarden
+        if (is_string($in['base_url'] ?? null) && trim($in['base_url']) !== '') $tBase = trim($in['base_url']);
+        if (is_string($in['api_key'] ?? null) && trim($in['api_key']) !== '') $tKey = trim($in['api_key']);
+        if (is_string($in['model'] ?? null)) $tModel = trim($in['model']);
+    }
+    if (trim($tBase) === '') out(['ok' => false, 'error' => 'Op de server is nog geen verbinding ingesteld.', 'fallback' => true], 400);
+    out(['ok' => true, 'result' => Gateway::test($tBase, $tKey, $tModel, $cfgObj->int('AI_WEB_TIMEOUT_SECONDS', 8, 2, 30))]);
+}
 
 if ($action === 'forget' || $action === 'delete_conversation') {
     if ($userId === null) out(['ok' => false, 'error' => 'Geen identiteit.'], 400);
@@ -115,13 +140,13 @@ if ($action === 'forget' || $action === 'delete_conversation') {
 }
 if ($action !== 'start') out(['ok' => false, 'error' => 'Onbekende actie.'], 400);
 
-$baseUrl = rtrim((string)((new Config($dir, is_array($conf) ? $conf : []))->get('LM_STUDIO_BASE_URL', '')), '/');
+$baseUrl = rtrim((string)$cfgObj->get('LM_STUDIO_BASE_URL', ''), '/');
 if ($baseUrl === '' || !preg_match('#^https?://#i', $baseUrl)) out(['ok' => false, 'error' => 'Geen gedeelde verbinding ingesteld.', 'fallback' => true], 400);
 if (!function_exists('curl_init')) out(['ok' => false, 'error' => 'PHP-curl ontbreekt op deze server.', 'fallback' => true], 501);
 
 $body = $in['body'] ?? null;
 if (!is_array($body) || !isset($body['messages']) || !is_array($body['messages']) || !$body['messages'] || count($body['messages']) > 400) out(['ok' => false, 'error' => 'Ongeldig bericht.'], 400);
-if (!empty($conf['model'])) $body['model'] = (string)$conf['model'];   // alleen het gekozen model
+if ($cfgObj->get('LM_STUDIO_MODEL_ID')) $body['model'] = (string)$cfgObj->get('LM_STUDIO_MODEL_ID');   // alleen het ingestelde model
 $body['stream'] = true;
 $body['stream_options'] = ['include_usage' => true];
 
@@ -173,10 +198,6 @@ $flushJob = function (bool $force = false) use (&$st, $jobs, $id, &$lastWrite) {
 $lastWrite = 0.0;
 $cancelFile = $jobs . '/' . $id . '.cancel';
 
-// beheerder? (alleen voor uitgebreide statusinformatie)
-$isAdmin = is_array($c) && isset($c['hash']) && is_string($in['password'] ?? null) && $in['password'] !== '' && password_verify($in['password'], $c['hash']);
-
-$cfgObj = new Config($dir, $conf ?? [], ['LM_STUDIO_API_KEY' => (string)($c['apiKey'] ?? '')]);
 $db = null;
 try {
     if (extension_loaded('pdo_sqlite')) {

@@ -336,7 +336,9 @@ let S={...DEFAULTS,...LS.get('lai.settings',{})};
 let chats=LS.get('lai.chats',[]);
 let curId=LS.get('lai.cur',null);
 let busy=false,ctrl=null,models=[],conn='unknown';
-const saveS=()=>LS.set('lai.settings',S);
+let shared={available:false,configured:false,managed:false,managedModel:null,serverKey:false};
+// De API-sleutel hoort op de server: met een serverkant wordt hij nooit in de browser bewaard.
+const saveS=()=>{const o={...S};if(shared.available)delete o.apiKey;LS.set('lai.settings',o)};
 const saveC=()=>{
   if(!LS.set('lai.chats',chats)){ // opslag vol: laat de inhoud van oude bijlagen vallen
     chats.forEach(c=>c.messages.forEach(x=>(x.attachments||[]).forEach(a=>{delete a.text;delete a.thumb})));
@@ -476,7 +478,7 @@ function renderSide(){
 function renderChrome(){
   $('#dClose').innerHTML=ic.x;
   $('#send').innerHTML=busy?ic.stop:ic.up;$('#send').title=busy?'Stoppen':'Verzenden';
-  $('#stSide').innerHTML=`<i class="dot ${conn==='ok'?'ok':conn==='bad'?'bad':''}"></i><span>${conn==='ok'?'Verbonden · '+esc(S.baseUrl.replace(/^https?:\/\//,'')):conn==='bad'?'Geen verbinding':'Verbinding controleren…'}</span>`;
+  $('#stSide').innerHTML=`<i class="dot ${conn==='ok'?'ok':conn==='bad'?'bad':''}"></i><span>${conn==='ok'?'Verbonden'+(serverSide()?'':' · '+esc(S.baseUrl.replace(/^https?:\/\//,''))):conn==='bad'?'Geen verbinding':'Verbinding controleren…'}</span>`;
 }
 const nearBottom=()=>scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<140;
 const toBottom=()=>{scroller.scrollTop=scroller.scrollHeight};
@@ -493,26 +495,69 @@ mq.addEventListener?.('change',applyTheme);
 /* ---------- verbinding ---------- */
 const base=()=>S.baseUrl.trim().replace(/\/+$/,'');
 const headers=()=>{const h={'Content-Type':'application/json'};if(S.apiKey.trim())h.Authorization='Bearer '+S.apiKey.trim();return h};
+function httpHint(status,detail){
+  const d=String(detail||'');const mm=d.match(/model\s+["']?([^"'\s]+)["']?\s+not found/i);
+  if(status===401)return 'De gateway weigerde de toegang (HTTP 401): de API-sleutel ontbreekt of is onjuist.';
+  if(status===403)return 'Toegang geweigerd (HTTP 403): de sleutel heeft hier geen rechten, of het adres wordt geblokkeerd.';
+  if(status===404&&mm)return `Het model '${mm[1]}' bestaat niet op de server (HTTP 404). Controleer de modelnaam, bijvoorbeeld met 'ollama list' (zoals qwen3:1.7b).`;
+  if(status===404)return 'Niet gevonden (HTTP 404): controleer of het adres op /v1 eindigt en of het model bestaat.';
+  if(status===429)return 'Te veel verzoeken (HTTP 429): de gateway of server begrenst het gebruik. Probeer het zo opnieuw.';
+  if(status===502)return 'De gateway kan Ollama niet bereiken (HTTP 502). Draait Ollama op de server en klopt het poortadres achter de gateway?';
+  if(status===503)return 'De server is tijdelijk niet beschikbaar (HTTP 503). Het model wordt mogelijk nog geladen; probeer het zo opnieuw.';
+  if(status===504)return 'De gateway kreeg te laat antwoord van het model (HTTP 504). Probeer het opnieuw of kies een kleiner model.';
+  return `HTTP ${status}${d?': '+d.slice(0,160):''}`;
+}
 function explain(e){
   const msg=String(e&&e.message||e);
+  if(e&&e.name==='TimeoutError')return 'Time-out: de server reageerde niet op tijd.';
   if(e instanceof TypeError||/failed to fetch|networkerror|load failed/i.test(msg)){
-    let t=`Kan geen verbinding maken met ${base()}.\n\n• Draait de LM Studio-server? (tabblad Developer → Status: Running)\n• Staat "Enable CORS" aan in de server-instellingen? (nodig als je dit bestand vanuit file:// of een andere host opent)\n• Bij gebruik vanaf een andere computer: zet "Serve on Local Network" aan en gebruik het IP-adres in de Base URL.`;
-    if(location.protocol==='https:'&&/^http:\/\//.test(base())&&!/localhost|127\.0\.0\.1/.test(base()))t+='\n• Deze pagina draait op https, maar de server op http: de browser blokkeert dat. Open chat.html lokaal.';
+    let t=`Kan geen verbinding maken met ${base()}.\n\n• Draait de modelserver (Ollama of LM Studio) en is het adres bereikbaar?\n• Rechtstreeks vanuit de browser moet de server CORS toestaan (Ollama: OLLAMA_ORIGINS). Laat verzoeken daarom via de server lopen: sla de verbinding op voor iedereen of stel AI_BASE_URL in op de server.\n• Een API-sleutel hoort niet in de browser: zet hem op de server.`;
+    if(location.protocol==='https:'&&/^http:\/\//.test(base())&&!/localhost|127\.0\.0\.1/.test(base()))t+='\n• Deze pagina draait op https, maar de server op http: de browser blokkeert dat. Gebruik een https-adres.';
     return t;
   }
   return msg;
 }
+/* verbindingstest: via de server (Bearer, geen CORS) zodra er een serverkant is, anders rechtstreeks */
+const serverSide=()=>shared.available&&(shared.configured||shared.managed||isAdmin);
+async function serverTest(){
+  try{
+    const r=await fetch('chat-run.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'test',password:isAdmin?adminPw:undefined,base_url:isAdmin?S.baseUrl:undefined,api_key:isAdmin&&S.apiKey?S.apiKey:undefined,model:isAdmin?S.model:undefined})});
+    const j=await r.json();
+    if(j&&j.fallback)return null;
+    if(!j||!j.ok)return {ok:false,error:{message:(j&&j.error)||'De test op de server mislukte.'}};
+    return j.result;
+  }catch{return null}
+}
 async function loadModels(verbose){
   const st=$('#cstat');
   if(verbose&&st){st.className='cstat';st.textContent='Verbinding testen…'}
+  if(serverSide()){
+    const r=await serverTest();
+    if(r){
+      if(r.ok){
+        models=r.models||[];conn='ok';
+        if(!S.model&&models.length&&!shared.managedModel){S.model=models.find(x=>!/embed/i.test(x))||models[0];saveS()}
+        if(st){
+          const want=shared.managedModel||S.model;
+          const miss=want&&r.model_found===false;
+          st.className='cstat '+(miss?'bad':'ok');
+          st.textContent=`Verbonden (HTTP ${r.status}) · ${models.length} model(len)`+(want?(miss?` · model '${want}' niet gevonden. Beschikbaar: ${models.slice(0,6).join(', ')||'geen'}`:` · '${want}' herkend`):'');
+        }
+      }else{
+        conn='bad';models=[];
+        if(st){st.className='cstat bad';st.textContent=(r.error&&r.error.message)||'Geen verbinding.'}
+      }
+      renderChrome();renderModelChips();return;
+    }
+  }
   try{
     const r=await fetch(base()+'/models',{headers:headers()});
-    if(!r.ok)throw new Error('HTTP '+r.status);
+    if(!r.ok){let d='';try{const j=await r.json();d=j.error?.message||j.error||''}catch{}throw new Error(httpHint(r.status,d))}
     const j=await r.json();
     models=(j.data||[]).map(x=>x.id).filter(Boolean);
     conn='ok';
     if(!S.model&&models.length){S.model=models.find(x=>!/embed/i.test(x))||models[0];saveS()}
-    if(st){st.className='cstat ok';st.textContent=`Verbonden · ${models.length} model(len) gevonden`}
+    if(st){st.className='cstat ok';st.textContent=`Verbonden (HTTP ${r.status}) · ${models.length} model(len) gevonden`}
   }catch(e){
     conn='bad';models=[];
     if(st){st.className='cstat bad';st.textContent=explain(e).split('\n')[0]}
@@ -562,7 +607,8 @@ async function serverCall(body){
 }
 const serverForget=()=>serverCall({action:'forget'});
 let serverOk=true;
-const useServer=()=>serverOk&&shared.available&&shared.configured&&S.serverRun!==false;
+const useServer=()=>serverOk&&shared.available&&(shared.configured||shared.managed)&&S.serverRun!==false;
+const canFallback=()=>!shared.managed&&!shared.serverKey; // met een serverkant-sleutel kan de browser het zelf niet
 function livePainter(c,m){
   let raf=0,lastSave=Date.now();
   const paint=()=>{
@@ -596,12 +642,12 @@ async function runServer(c,m){
     const res=await fetch('chat-run.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'start',body:buildBody(c),client_id:CID,conversation_id:c.id,password:isAdmin?adminPw:undefined})});
     const r=await res.json().catch(()=>null);
     if(!res.ok||!r||!r.ok){
-      if(!r||r.fallback||res.status===404||res.status===501){serverOk=false;return false}
+      if((!r||r.fallback||res.status===404||res.status===501)&&canFallback()){serverOk=false;return false}
       throw new Error(r.error||'HTTP '+res.status);
     }
     m.job=r.id;saveC();
   }catch(e){
-    if(e instanceof TypeError){serverOk=false;return false}
+    if(e instanceof TypeError&&canFallback()){serverOk=false;return false}
     m.error=explain(e);finishGen(c,m);return true;
   }
   return followJob(c,m);
@@ -630,7 +676,7 @@ async function followJob(c,m){
       if(m.content||m.reasoning||m._note||(m.tools&&m.tools.length))P.sched();
       if(r.status!=='running'){
         if(r.status==='error'){
-          if(r.unreachable&&!m.content&&!m.reasoning){fallback=true;serverOk=false}
+          if(r.unreachable&&!m.content&&!m.reasoning&&canFallback()){fallback=true;serverOk=false}
           else m.error=r.error||'Fout op de server.';
         }
         break;
@@ -669,7 +715,7 @@ async function runDirect(c,m){
     const res=await fetch(base()+'/chat/completions',{method:'POST',headers:headers(),body:JSON.stringify(buildBody(c)),signal:ctrl.signal});
     if(!res.ok){
       let t=await res.text();try{const j=JSON.parse(t);t=j.error?.message||j.error||t}catch{}
-      throw new Error(`HTTP ${res.status}: ${typeof t==='string'?t:JSON.stringify(t)}`);
+      throw new Error(httpHint(res.status,typeof t==='string'?t:JSON.stringify(t)));
     }
     conn='ok';
     if(S.stream&&res.body){
@@ -881,10 +927,10 @@ $('#file').addEventListener('change',async e=>{
 const NUM=[
   ['temperature','Temperature','Hoger = creatiever, lager = voorspelbaarder. Typisch 0.6–0.8.',.05],
   ['top_p','Top P','Nucleus sampling. Leeg = niet meesturen (bijv. 0.8–0.95).',.05],
-  ['top_k','Top K','Beperk tot de K meest waarschijnlijke tokens (bijv. 20–40).',1],
-  ['min_p','Min P','Minimale kans t.o.v. het beste token (bijv. 0.05).',.01],
+  ['top_k','Top K','Beperk tot de K meest waarschijnlijke tokens (bijv. 20–40). Ollama via /v1 negeert dit.',1],
+  ['min_p','Min P','Minimale kans t.o.v. het beste token (bijv. 0.05). Ollama via /v1 negeert dit.',.01],
   ['max_tokens','Max tokens','Maximale lengte van het antwoord. Leeg of -1 = onbeperkt.',1],
-  ['repeat_penalty','Repeat penalty','Straf voor herhaling (LM Studio/llama.cpp), bijv. 1.1.',.01],
+  ['repeat_penalty','Repeat penalty','Straf voor herhaling (LM Studio/llama.cpp), bijv. 1.1. Ollama via /v1 negeert dit.',.01],
   ['frequency_penalty','Frequency penalty','OpenAI-stijl, -2 t/m 2.',.1],
   ['presence_penalty','Presence penalty','OpenAI-stijl, -2 t/m 2.',.1],
   ['seed','Seed','Vaste seed voor reproduceerbare antwoorden.',1],
@@ -892,7 +938,7 @@ const NUM=[
 const num=(k,l,h,step)=>`<div class="fld"><label for="f_${k}">${l}</label><input type="number" id="f_${k}" data-k="${k}" step="${step}" placeholder="standaard" value="${esc(S[k])}"><div class="h">${h}</div></div>`;
 const chk=(k,t,d)=>`<label class="chk"><input type="checkbox" data-k="${k}"${S[k]?' checked':''}><span><b>${t}</b><small>${d}</small></span></label>`;
 const SHARED_KEYS=['baseUrl','model','system','temperature','top_p','top_k','min_p','max_tokens','frequency_penalty','presence_penalty','repeat_penalty','seed','stop','stream','serverRun','toolMode','storeChats','historyLimit','noThink','extraBody'];
-let shared={available:false,configured:false},isAdmin=false,adminPw='';
+let isAdmin=false,adminPw='';
 try{adminPw=sessionStorage.getItem('lai.pw')||''}catch{}
 const stash=v=>{try{v?sessionStorage.setItem('lai.pw',v):sessionStorage.removeItem('lai.pw')}catch{}};
 async function api(body){
@@ -906,12 +952,14 @@ async function loadShared(){
     const r=await fetch('chat-config.php',{cache:'no-store'});
     const j=await r.json();
     if(!j||j.ok!==true)throw 0;
-    shared={available:true,configured:!!j.configured};
+    shared={available:true,configured:!!j.configured,managed:!!(j.managed&&j.managed.base),managedModel:(j.managed&&j.managed.model)||null,serverKey:!!j.server_key};
+    if(S.apiKey){S.apiKey='';saveS()} // een eerder in de browser bewaarde sleutel wordt gewist
     if(j.configured){for(const k of SHARED_KEYS)if(j.config&&k in j.config)S[k]=j.config[k]}
     if(adminPw&&j.configured){const v=await api({action:'verify',password:adminPw});isAdmin=!!v.ok;if(!isAdmin){adminPw='';stash('')}}
   }catch{shared={available:false,configured:false}}
 }
 const locked=()=>shared.configured&&!isAdmin;
+const managedConn=()=>shared.managed;
 function adminHTML(){
   const pw=(id,l,h)=>`<div class="fld"><label for="${id}">${l}</label><input type="password" id="${id}" autocomplete="${id==='pw_new'?'new-password':'current-password'}" placeholder="••••••••">${h?`<div class="h">${h}</div>`:''}</div>`;
   let h='<h3>Delen met iedereen</h3>';
@@ -922,12 +970,19 @@ function adminHTML(){
   return h+'<div class="cstat" id="admStat" style="margin-top:10px"></div>';
 }
 function renderDrawer(){
-  const conn_=`
+  const connBlock=managedConn()?`
   <h3>Verbinding</h3>
-  <div class="fld"><label for="f_baseUrl">Base URL</label><input type="text" id="f_baseUrl" data-k="baseUrl" value="${esc(S.baseUrl)}" spellcheck="false"><div class="h">LM Studio standaard: <code>http://localhost:1234/v1</code>. Andere pc op je netwerk: <code>http://192.168.x.x:1234/v1</code>. Voor bezoekers van buiten je netwerk moet dit een publiek bereikbaar (https) adres zijn.</div></div>
-  <div class="fld"><label for="f_apiKey">API-sleutel</label><input type="password" id="f_apiKey" data-k="apiKey" value="${esc(S.apiKey)}" autocomplete="off" placeholder="optioneel"><div class="h">LM Studio vraagt er normaal geen. Wordt als Bearer-token meegestuurd en nooit gedeeld.</div></div>
-  <div class="fld"><label for="f_model">Model</label><input type="text" id="f_model" data-k="model" value="${esc(S.model)}" spellcheck="false" placeholder="bijv. qwen3-8b"><div class="mods" id="mods"></div><div class="h">Leeg = het model dat in LM Studio geladen is.</div></div>
+  <p class="h" style="font-size:13.5px;color:var(--ink2,var(--fg));margin:0">Adres, model en API-sleutel van de modelserver worden door de server beheerd${shared.managedModel?` (model: <b>${esc(shared.managedModel)}</b>)`:''}. Er staat niets in je browser.</p>
+  <div class="rowb" style="margin-top:10px"><button class="btn pri" id="test">Test verbinding</button><span class="cstat" id="cstat"></span></div>
+  `:`
+  <h3>Verbinding</h3>
+  <div class="fld"><label for="f_baseUrl">Base URL</label><input type="text" id="f_baseUrl" data-k="baseUrl" value="${esc(S.baseUrl)}" spellcheck="false" placeholder="https://jouw-gateway/v1"><div class="h">Een OpenAI-compatibele API die op <code>/v1</code> eindigt, bijvoorbeeld de https-gateway voor Ollama. Voor LM Studio lokaal: <code>http://localhost:1234/v1</code>.</div></div>
+  <div class="fld"><label for="f_apiKey">API-sleutel</label><input type="password" id="f_apiKey" data-k="apiKey" value="${esc(S.apiKey)}" autocomplete="off" placeholder="${shared.serverKey?'Opgeslagen op de server (leeg laten om te behouden)':'optioneel'}"><div class="h">${shared.available?'Wordt als Bearer-token alleen op de server bewaard en gebruikt; niet in de browser.':'Zonder serverkant bewaart alleen deze browser de sleutel.'}${shared.serverKey&&isAdmin?' <a href="#" id="clearkey">Opgeslagen sleutel verwijderen</a>':''}</div></div>
+  <div class="fld"><label for="f_model">Model</label><input type="text" id="f_model" data-k="model" value="${esc(S.model)}" spellcheck="false" placeholder="bijv. qwen3:1.7b"><div class="mods" id="mods"></div><div class="h">De exacte naam op de server (Ollama: zie <code>ollama list</code>, zoals <code>qwen3:1.7b</code>).</div></div>
   <div class="rowb"><button class="btn pri" id="test">Test verbinding</button><span class="cstat" id="cstat"></span></div>
+  ${shared.available&&!shared.configured?'<div class="h" style="margin-top:6px">Sla de instellingen eerst op voor iedereen (onderaan). Daarna test de server de verbinding, zonder CORS en met de sleutel.</div>':''}
+`;
+  const conn_=connBlock+`
 
   <h3>Systeemprompt</h3>
   <div class="fld"><textarea id="f_system" data-k="system" placeholder="Bijv. Je bent een behulpzame assistent die in het Nederlands antwoordt.">${esc(S.system)}</textarea></div>
@@ -971,6 +1026,13 @@ function renderDrawer(){
 async function adminAction(kind){
   const stat=$('#admStat'),say=(t,c)=>{if(stat){stat.className='cstat '+(c||'');stat.textContent=t}};
   const val=id=>($('#'+id)?.value||'');
+  if(kind==='clearkey'){
+    if(!confirm('De op de server opgeslagen API-sleutel verwijderen?'))return;
+    const config={};for(const k of SHARED_KEYS)config[k]=S[k];
+    const r=await api({action:'save',password:adminPw,config,clear_api_key:true});
+    if(r.ok){shared.serverKey=false;renderDrawer();validateExtra()}else say(r.error||'Mislukt.','bad');
+    return;
+  }
   if(kind==='logout'){isAdmin=false;adminPw='';stash('');renderDrawer();return}
   if(kind==='unlock'){
     const pw=val('pw_in');if(!pw)return;
@@ -990,7 +1052,7 @@ async function adminAction(kind){
     const config={};for(const k of SHARED_KEYS)config[k]=S[k];const apiKey=S.apiKey;
     say('Opslaan…');
     const r=await api({action:'save',password:pw,newPassword:np||undefined,config,apiKey});
-    if(r.ok){shared.configured=true;isAdmin=true;adminPw=np||pw;stash(adminPw);renderDrawer();validateExtra();const s=$('#admStat');if(s){s.className='cstat ok';s.textContent='Opgeslagen: dit geldt nu voor iedereen.'}}
+    if(r.ok){shared.configured=true;isAdmin=true;adminPw=np||pw;stash(adminPw);if(apiKey){shared.serverKey=true;S.apiKey=''}renderDrawer();validateExtra();const s=$('#admStat');if(s){s.className='cstat ok';s.textContent='Opgeslagen: dit geldt nu voor iedereen.'}loadModels(true)}
     else say(r.error||'Opslaan mislukt.','bad');
   }
 }
@@ -1014,6 +1076,7 @@ $('#dBody').addEventListener('input',e=>{
   if(k==='baseUrl'||k==='apiKey'){conn='unknown';renderChrome();clearTimeout(connTimer);connTimer=setTimeout(()=>loadModels(true),700)}
 });
 $('#dBody').addEventListener('click',e=>{
+  const ck=e.target.closest('#clearkey');if(ck){e.preventDefault();adminAction('clearkey');return}
   const b=e.target.closest('button');if(!b)return;
   if(b.dataset.m){S.model=b.dataset.m;saveS();$('#f_model').value=S.model;renderChrome();renderModelChips()}
   else if(b.dataset.adm)adminAction(b.dataset.adm);
